@@ -1,0 +1,104 @@
+/* ===================== Document collections (partner-preview/src/collections.css) ===================== */
+/* Reuses the app's cards, pills, board columns and --op-* tokens, so light and dark both follow the theme. */
+.dc .btn.sm{min-height:32px}
+/* Segmented controls and list buttons keep their own width instead of stretching across the card */
+.dc-tabs,.dc .seg{align-self:flex-start;max-width:100%}
+.dc-tlist .ti{width:100%}
+.dc-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.dc-stat{display:flex;flex-direction:column;gap:2px}
+.dc-num{font-family:var(--font-mono);font-variant-numeric:tabular-nums slashed-zero;font-size:26px;font-weight:600;line-height:1.15}
+.dc-lbl{font-size:14px;font-weight:600}
+.dc-actions{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end}
+.dc-search{margin-left:auto}
+.dc-search input{width:min(100%,280px)}
+@media (max-width:640px){.dc-search{margin-left:0;flex:1 1 100%}.dc-search input{width:100%}}
+
+/* Board: 4 or 5 equal columns when there is room; otherwise the board scrolls sideways inside itself. */
+.board.dc-board{grid-template-columns:repeat(4,minmax(0,1fr))}
+.board.dc-board.dc-cols5{grid-template-columns:repeat(5,minmax(0,1fr))}
+@container (max-width:1100px){.board.dc-board,.board.dc-board.dc-cols5{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(min(82%,270px),1fr);overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding-bottom:8px}.board.dc-board>.col{scroll-snap-align:start}}
+@media (max-width:1100px){.board.dc-board,.board.dc-board.dc-cols5{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(min(82%,270px),1fr);overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding-bottom:8px}.board.dc-board>.col{scroll-snap-align:start}}
+.dc-card{gap:6px}
+.dc-empty{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.dc-prog{display:flex;align-items:center;gap:8px;min-width:0}
+.dc-bar{flex:1;display:block;height:6px;border-radius:3px;background:var(--op-rule);overflow:hidden;min-width:48px}
+.dc-bar>i{display:block;height:100%;border-radius:3px;background:var(--op-accent)}
+.dc-bar.ok>i{background:var(--op-success)}
+.dc-p0{width:0}.dc-p1{width:5%}.dc-p2{width:10%}.dc-p3{width:15%}.dc-p4{width:20%}.dc-p5{width:25%}.dc-p6{width:30%}.dc-p7{width:35%}.dc-p8{width:40%}.dc-p9{width:45%}.dc-p10{width:50%}
+.dc-p11{width:55%}.dc-p12{width:60%}.dc-p13{width:65%}.dc-p14{width:70%}.dc-p15{width:75%}.dc-p16{width:80%}.dc-p17{width:85%}.dc-p18{width:90%}.dc-p19{width:95%}.dc-p20{width:100%}
+.dc-due{font-size:12px;font-weight:600;color:var(--op-ink-muted);white-space:nowrap}
+.dc-due.bad{color:var(--op-danger)}
+.pagehead .dc-due{font-size:13px}
+.dc-bang{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--op-warning-soft);color:var(--op-warning);border:1px solid var(--op-warning);font-weight:800;font-size:12px;line-height:1}
+.dc-chase{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--op-ink-muted)}
+
+/* Lists of rows (Just came back, client file, Today) */
+.dc-mini{gap:0}
+.dc-mini>li{border-top:1px solid var(--op-rule)}
+.dc-mini>li:first-child{border-top:0}
+.dc-minirow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 12px;padding:8px 0;min-height:44px;color:var(--op-ink);text-decoration:none}
+.dc-minirow:hover .dc-mt{text-decoration:underline}
+.dc-mt{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.dc-link{display:inline-flex;align-items:center;min-height:32px}
+.dc a:not(.btn):not(.jobcard):not(.dc-minirow),[data-rv-key^="coll-"] a:not(.btn):not(.jobcard):not(.dc-minirow){display:inline-flex;align-items:center;min-height:32px}
+.dc-frow{padding:6px 0}
+.dc-file{font-family:var(--font-mono);font-size:12px;overflow-wrap:anywhere;min-width:0}
+
+/* Detail */
+.dc-detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);gap:16px;align-items:start}
+@media (max-width:980px){.dc-detail{grid-template-columns:minmax(0,1fr)}}
+.dc-group{display:flex;flex-direction:column;gap:6px}
+.dc-group+.dc-group{margin-top:6px}
+.dc-items{gap:0}
+.dc-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--op-rule)}
+.dc-istate{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;justify-content:flex-end;min-width:0}
+@media (max-width:640px){.dc-item{grid-template-columns:minmax(0,1fr)}.dc-istate{justify-content:flex-start}}
+.dc-side .actions .btn{flex:1 1 auto}
+.dc .steps .st{font-weight:500}
+
+/* New collection */
+.dc-form .f input:not([type="checkbox"]),.dc-form .f select{width:100%}
+.dc-narrow{max-width:420px}
+.dc-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px 12px}
+.dc-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.dc-row{display:grid;grid-template-columns:minmax(130px,190px) minmax(0,1fr) minmax(140px,170px) auto;gap:8px 10px;align-items:end;padding:10px 12px;border:1px solid var(--op-rule);border-radius:8px;background:var(--op-surface-2)}
+@media (max-width:760px){.dc-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.dc-row .dc-rname{grid-column:1/-1;order:-1}}
+.dc-fs{border:0;padding:0;margin:0}
+
+/* Templates */
+.dc-tplgrid{display:grid;grid-template-columns:minmax(220px,290px) minmax(0,1fr);gap:16px;align-items:start}
+.dc-tplgrid>.dc-files{grid-column:1/-1}
+@media (max-width:860px){.dc-tplgrid{grid-template-columns:minmax(0,1fr)}}
+.dc-tlist{gap:6px}
+.dc-titems{gap:0}
+.dc-titem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:8px 0;border-top:1px solid var(--op-rule)}
+.dc-titem.dc-parked .dc-tn{color:var(--op-ink-muted)}
+@media (max-width:640px){.dc-titem{grid-template-columns:minmax(0,1fr)}}
+.dc-addform{display:grid;grid-template-columns:minmax(140px,200px) minmax(0,1fr) minmax(0,1fr) auto;gap:8px 10px;align-items:end;padding-top:12px;border-top:1px solid var(--op-rule)}
+.dc-addform .f input,.dc-addform .f select{width:100%}
+@media (max-width:760px){.dc-addform{grid-template-columns:minmax(0,1fr)}}
+
+/* Reminders & settings */
+.dc-setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
+.dc-check{display:flex;gap:10px;align-items:flex-start;min-height:32px;font-size:14px;font-weight:500;cursor:pointer}
+.dc-check input{margin-top:3px;flex:none}
+.dc-setgrid .f input,.dc-setgrid .f select{width:100%}
+
+/* Client portal: a phone-width, firm-branded card */
+.dc-portalpage{align-items:center}
+.dc-strip{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;width:min(100%,460px);background:var(--op-accent-soft);border:1px solid var(--op-accent);border-radius:var(--r);padding:8px 12px;font-size:14px;font-weight:600}
+.dc-portal{width:min(100%,460px)}
+.dc-portal h1{font-size:1.35rem}
+.dc-brand{display:flex;gap:10px;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--op-rule)}
+.dc-mono{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--op-accent);color:var(--op-accent-ink);font-family:var(--font-display);font-weight:800;font-size:13px;letter-spacing:.06em}
+.dc-firm{font-weight:700}
+.dc-progline{font-weight:600}
+.dc-pitems{gap:8px}
+.dc-pitem{display:flex;flex-direction:column;gap:8px;border:1px solid var(--op-rule);border-radius:8px;padding:10px 12px;background:var(--op-surface)}
+.dc-pitem.dc-isdone{background:var(--op-surface-2)}
+.dc-pitem.dc-over{border-style:dashed;border-color:var(--op-accent);background:var(--op-accent-soft)}
+.dc-pstate{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0}
+.dc-dropnote{display:none}
+@media (hover:hover) and (pointer:fine){.dc-dropnote{display:inline}}
+.dc-donebox{align-items:center;text-align:center;padding:12px 0}
+.dc-tick{display:grid;place-items:center;width:60px;height:60px;border-radius:50%;background:var(--op-tier-auto-bg);color:var(--op-success)}
