@@ -8,7 +8,8 @@
      release(c, gate, a, o) canRelease(c, gate, a, o) gateState(c, gate) drive(c, untilGate, o)
      raise(c, code, o) raiseManual(c, code, a, o) resolve(x, a, o) close(x, a, o) setSeverity(x, a, to, o) approveSeverity(x, a, o)
      requestOverride(x, a, o) approveOverride(x, a) setOverridable(code, on, a) recordFallback(x, a, o) reconcileFallback(x, a, o)
-     change(c, a, data, o) outsideEdit(c, patch) restoreVersion(c, a)
+     change(c, a, data, o) outsideEdit(c, patch) restoreVersion(c, a) calculate(c, a, o) decideItem(c, lineId, a, o) setInputs(c, a, inputs, o)
+     draftResponse(c, a, kind, drafts)
      requestTx(c, fn, a) g18Checks(t) g18Blockers(t) signG18(t, a) transmit(t, a, outcome) checkStatus(t, a, truth) retry(t, a) manualFallback(t, a, o)
      receive(item) routeInbound(item, caseId, a) confirmInboundDate(item, a, o) portal(c, action, d) recordWithdrawal(c, a, o) upload(c, itemId, file, a) approveNa(c, itemId, a)
      chooseRemedy(c, a, route, o) remind(c, kind, a) addHold / legalHold / releaseHold incidentStep(inc, step, a, o) closeIncident(inc, a)
@@ -96,6 +97,19 @@ const ENGINE = (() => {
     return null;
   }
 
+  // The Operon AI agent acting: not the independent reviewer, and only while the AI service is up and AI work is not paused.
+  function aiWhy(a) {
+    if (!a || a.type !== 'ai' || a.role !== 'AI Agent') return 'Only the Operon AI agent can do this';
+    if (S.paused) return 'AI work is paused';
+    if (!S.aiUp) return 'The AI service is unavailable';
+    return null;
+  }
+  // Rulesets by version (own keys only).
+  const rulesetOf = (v) => (typeof CALC !== 'undefined' ? CALC.rulesetOf(v) : null);
+  // The extracted values changed after the last calculation (a decision, a corrected value): the calculation must be rerun.
+  const calcStale = (c) => (c.inputs && c.calc && typeof c.calc.inputs === 'string' && c.calc.inputs !== digest(c.inputs)
+    ? 'The extracted values changed after version ' + vN(c) + ': rerun the calculation' : null);
+
   /* ===================== State ===================== */
   SEEDERS.push((s) => Object.assign(s, {
     clients: [], cases: [], exceptions: [], txs: [], inbound: [], incidents: [],
@@ -154,6 +168,7 @@ const ENGINE = (() => {
       gates: {}, req: { G02: [{ key: 'compare', label: 'SARS registered details compared with the client record', done: false }] },
       items: [], docs: [], questionnaire: { status: 'open', required: (o.required || ['employment', 'medical', 'ra', 'interest', 'rental', 'cgt', 'foreign']).slice(), answers: {}, at: null },
       priorYear: (o.priorYear || []).slice(), prepop: null, notices: [],
+      inputs: o.inputs ? structuredClone(o.inputs) : null,  // extracted values with their lineage (calc.js)
       calc: null, schedules: null, itr12: null, recon: { ok: true, issues: [] }, versions: [], approval: null, frozen: null,
       subTx: null, submission: null, da: null, vrf: null, aud: null, ita34: null, decision: null, outcome: null, remedy: null,
       retention: { from: null, until: null, review: null, holds: [], raised: {} },
@@ -247,15 +262,16 @@ const ENGINE = (() => {
     const ap = () => { const p = approvalProblem(c); if (p) miss.push(p); };
     const dr = () => { const d = drift(c); if (d.length) miss.push('The record differs from version ' + vN(c) + ' (' + list(d) + ')'); };
     const rs = () => { if (c.calc && c.calc.ruleset !== S.rulesetVersion) miss.push('The calculation used ruleset ' + c.calc.ruleset + '; the current ruleset is ' + S.rulesetVersion); };
+    const st = () => { const s = calcStale(c); if (s) miss.push(s); };
     switch (g) {
       case 'G01': clientOf(c).kyc.filter((k) => !k.ok).forEach((k) => miss.push(k.label + ' is not complete')); break;
       case 'G03': if (c.questionnaire.status !== 'submitted') miss.push('The client has not submitted the questionnaire'); break;
       case 'G04': c.items.forEach((it) => { const s = itemState(c, it); if (s !== 'validated' && s !== 'na') miss.push(it.label + (s === 'held' ? ' is held by an exception' : ' is outstanding')); }); break;
-      case 'G05': if (!c.calc) miss.push('No calculation yet'); if (!c.versions.length) miss.push('No version recorded'); rs(); break;
+      case 'G05': if (!c.calc) miss.push('No calculation yet'); if (!c.versions.length) miss.push('No version recorded'); rs(); st(); break;
       case 'G06': ap(); break;
-      case 'G07': ap(); dr(); break;
-      case 'G08': ap(); dr(); if (!c.recon.ok) miss.push('The final reconciliation fails'); rs(); break;
-      case 'G09': ap(); dr(); if (!c.frozen || c.frozen.version !== vN(c)) miss.push('Version ' + vN(c) + ' is not frozen'); break;
+      case 'G07': ap(); dr(); st(); break;
+      case 'G08': ap(); dr(); if (!c.recon.ok) miss.push('The final reconciliation fails'); rs(); st(); break;
+      case 'G09': ap(); dr(); st(); if (!c.frozen || c.frozen.version !== vN(c)) miss.push('Version ' + vN(c) + ' is not frozen'); break;
       case 'G12': if (!c.ita34) miss.push('No ITA34 received'); break;
       case 'G14': if (!c.decision) miss.push('The client has not decided'); break;
       case 'G15':
@@ -476,7 +492,7 @@ const ENGINE = (() => {
     const def = CODE[code]; if (!def) throw new Error('Unknown exception code ' + code);
     const a = o.by || ACTOR.system();
     if (c && o.dedupe !== false) {
-      const dup = exOf(c).find((x) => x.code === code && isOpen(x) && (x.item || null) === (o.item || null) && (x.txId || null) === (o.txId || null) && (x.docId || null) === (o.docId || null) && (x.holdId || null) === (o.holdId || null) && (x.inboundId || null) === (o.inboundId || null));
+      const dup = exOf(c).find((x) => x.code === code && isOpen(x) && (x.item || null) === (o.item || null) && (x.txId || null) === (o.txId || null) && (x.docId || null) === (o.docId || null) && (x.holdId || null) === (o.holdId || null) && (x.inboundId || null) === (o.inboundId || null) && (x.calcRef || null) === (o.calcRef || null));
       if (dup) return dup;
     }
     const gates = resolveGates(c, def, o);
@@ -487,7 +503,7 @@ const ENGINE = (() => {
       clientAction: o.clientAction || (def.owner === 'Client' ? def.resolution : null), clientDue: o.clientDue || null, sarsDeadline: o.sarsDeadline || null,
       related: [], parent: o.parent || null, resolution: null, evidence: null, resolvedBy: null, resolvedById: null, resolvedAt: null,
       humanApproval: def.sev === 'S1' || def.sev === 'S2', gateReleased: '', byGate: BY_GATE.includes(code), fromGate: o.fromGate || null,
-      item: o.item || null, docId: o.docId || null, txId: o.txId || null, holdId: o.holdId || null, inboundId: o.inboundId || null, status: 'raised', assignee: null,
+      item: o.item || null, docId: o.docId || null, txId: o.txId || null, holdId: o.holdId || null, inboundId: o.inboundId || null, calcRef: o.calcRef || null, status: 'raised', assignee: null,
       incidentId: null, closedBy: null, closedAt: null, fallback: def.blocking === 'Conditional' ? { recorded: null, reconciled: null } : null,
       override: null, sevRequest: null, note: o.note || '', at: now(),
     };
@@ -546,6 +562,14 @@ const ENGINE = (() => {
   }
   const txOf = (x) => (x.txId ? txById(x.txId) : null);
   const holdGuard = (c, x) => { const h = x.holdId && c.retention.holds.find((y) => y.id === x.holdId); return h && !h.released ? 'Release hold ' + h.id + ' (' + h.label + ') first' : null; };
+  // A judgement item the calculator flagged resolves once the Tax Consultant recorded the amount and rationale and the calculation was rerun.
+  function judgementGuard(c, x) {
+    if (!x.calcRef || !c.inputs) return null;
+    const l = (c.inputs.lines || []).find((y) => y.id === x.calcRef);
+    if (!l) return null;
+    if (!(l.decided && l.decided.by)) return 'Record the Tax Consultant’s amount and rationale for ' + l.id + ' first';
+    return c.calc && (c.calc.pending || []).some((p) => p.line === l.id) ? 'Rerun the calculation with the decision on ' + l.id + ' first' : null;
+  }
   const RESOLVE_GUARD = {
     'DOC-04': (c, x) => (x.related.map(exById).some((y) => y && y.code === 'SEC-01' && isOpen(y)) ? 'Resolve the linked SEC-01 incident first' : null),
     'INT-04': (c, x) => { const t = txOf(x); return t && t.status === 'unknown' ? 'Check the SARS status of ' + t.id + ' first: it is still unknown' : null; },
@@ -562,6 +586,21 @@ const ENGINE = (() => {
     'INT-01': () => (S.link.auth ? null : 'SARS authentication is still failing'),
     'INT-02': () => (S.link.rights ? null : 'The eFiling rights are still missing'),
     'RET-01': holdGuard, 'RET-02': holdGuard, 'RET-04': holdGuard,
+    'TAX-01': (c) => (c.calc && c.calc.errors && c.calc.errors.length ? 'The current calculation still fails validation: ' + c.calc.errors[0] : null),
+    'TAX-02': judgementGuard,
+    'AI-05': judgementGuard,
+    'TAX-06': (c) => {
+      const rs = rulesetOf(S.rulesetVersion);
+      if (!rs) return 'There is no ruleset ' + S.rulesetVersion;
+      if (rs.year !== c.year) return 'The configured ruleset ' + S.rulesetVersion + ' is for ' + rs.year + ', not ' + c.year;
+      return c.calc && c.calc.ruleset === S.rulesetVersion && !c.rerun ? null : 'Rerun the calculation on ruleset ' + S.rulesetVersion + ' first';
+    },
+    'AI-07': (c) => {
+      if (c.rerun) return 'Rerun the calculation on ruleset ' + S.rulesetVersion + ' first (impact assessment)';
+      const rs = rulesetOf(S.rulesetVersion);
+      if (rs && rs.year !== c.year) return 'The configured ruleset ' + S.rulesetVersion + ' is for ' + rs.year + ', not ' + c.year + ': restore the approved ruleset first';
+      return hasOpen(c, 'TAX-06') ? 'Resolve TAX-06 (wrong-year ruleset) first' : null;
+    },
   };
   function resolveGuard(c, x) {
     if (x.byGate && x.code !== 'CLT-07') return x.code + ' closes when ' + list(x.gates.filter((g) => g !== x.fromGate && g !== 'G17')) + ' pass' + (x.gates.some((g) => SUBSTANTIVE.includes(g) && g !== 'G09') ? ' and the SARS transaction succeeds' : '');
@@ -762,7 +801,8 @@ const ENGINE = (() => {
   /* ===================== Versions ===================== */
   function change(c, a, data, o) {
     o = o || {};
-    if (!(a.type === 'ai' || a.type === 'system')) { const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Change refused', w); }
+    if (a.type === 'ai') { const w = aiWhy(a); if (w) return refuse(a, c, 'Change refused', w); }
+    else if (a.type !== 'system') { const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Change refused', w); }
     if (c.submission && c.submission.ok) return refuse(a, c, 'Change refused', 'The return is submitted; a correction goes through G15 (Request for Correction)');
     const fl = itr12InFlight(c); if (fl) return refuse(a, c, 'Change refused', 'The ITR12 ' + fl.id + ' may already be with SARS (' + fl.status + '); establish its status first', { sarsTx: fl.id });
     const reason = String(o.reason || '').trim(); if (!reason) return refuse(a, c, 'Change refused', 'Give the reason for the change');
@@ -872,6 +912,7 @@ const ENGINE = (() => {
     const out = liveEx(c).filter((x) => blocksNow(x) && !x.byGate && x.sev === 'S3' && x.gates.includes('G18') && (!x.txId || x.txId === t.id)
       && !ign.includes(x.code) && !(x.code === 'INT-03' && S.link.up)).map((x) => x.code + ' (' + x.sev + ')');
     S.incidents.filter((i) => i.caseId === c.id && i.status === 'open').forEach((i) => out.push('open incident ' + i.id + ' (G17)'));
+    if (t.fn === 'itr12' && calcStale(c)) out.push(calcStale(c));
     return out;
   }
   const checkText = (bad, gb) => [bad.length ? 'Check ' + bad.map((k) => k.n + ' fails (' + k.why + ')').join('; ') : '', gb.length ? 'Blocked by ' + list(gb) : ''].filter(Boolean).join('; ');
@@ -1581,12 +1622,14 @@ const ENGINE = (() => {
   function rulesetChange(a, o) {
     o = o || {};
     if (!(a.type === 'platform' || a.type === 'system')) return refuse(a, null, 'Ruleset change refused', 'The platform team changes the ruleset');
+    if (o.version && typeof CALC !== 'undefined' && !rulesetOf(o.version)) return refuse(a, null, 'Ruleset change refused', 'There is no ruleset ' + o.version);
     const before = S.rulesetVersion; S.rulesetVersion = String(o.version || before);
-    log(a, 'Changed the tax ruleset from ' + before + ' to ' + S.rulesetVersion + (o.wrongYear ? ' (wrong tax year configured)' : ''), { before, after: S.rulesetVersion, result: 'Changed' });
+    const rs = rulesetOf(S.rulesetVersion);
+    log(a, 'Changed the tax ruleset from ' + before + ' to ' + S.rulesetVersion + (rs ? ' (the ' + rs.year + ' year of assessment)' : ''), { before, after: S.rulesetVersion, result: 'Changed' });
     S.cases.filter((c) => !(c.submission && c.submission.ok) && c.calc).forEach((c) => {
       c.rerun = true;
       raise(c, 'AI-07', { by: ACTOR.system(), note: 'Ruleset ' + before + ' → ' + S.rulesetVersion + ' after material processing', noSettle: true });
-      if (o.wrongYear) raise(c, 'TAX-06', { by: ACTOR.system(), note: 'Ruleset ' + S.rulesetVersion + ' is configured for the wrong tax year', noSettle: true });
+      if (rs && rs.year !== c.year) raise(c, 'TAX-06', { by: ACTOR.system(), noSettle: true, note: 'Ruleset ' + S.rulesetVersion + ' is for the ' + rs.year + ' year of assessment, not ' + c.year });
       settle(c);
     });
     return okr();
@@ -1639,6 +1682,79 @@ const ENGINE = (() => {
     return { ok: true, n: S.audit.length, badAt: -1 };
   }
 
+  /* ===================== The calculation (calc.js) ===================== */
+  // Runs the calculator on the case's extracted values, records the result as a new version, then raises what it found:
+  // TAX-01 validation errors, TAX-06 a ruleset for another year, TAX-02/AI-05 undecided judgement items, TAX-05 a material
+  // unexplained year-on-year change (once per figure).
+  function calculate(c, a, o) {
+    o = o || {};
+    if (typeof CALC === 'undefined') return fail('The calculator is not loaded');
+    if (!c.inputs) return fail('No extracted values on ' + c.id);
+    const data = CALC.forCase(c); const k = data.calc;
+    k.inputs = digest(c.inputs);  // the extracted values this calculation used (calcStale compares it)
+    const r = change(c, a, data, { reason: o.reason || 'Calculation on ruleset ' + k.ruleset, material: o.material });
+    if (!r.ok) return r;
+    const ai = ACTOR.ai(); const sys = ACTOR.system();
+    if (k.errors.length) raise(c, 'TAX-01', { by: sys, note: k.errors.join('; '), noSettle: true });
+    if (k.wrongYear) raise(c, 'TAX-06', { by: sys, note: 'Ruleset ' + k.ruleset + ' is for the ' + k.year + ' year of assessment, not ' + c.year, noSettle: true });
+    k.pending.forEach((p) => raise(c, p.code, { by: ai, calcRef: p.line, noSettle: true,
+      note: p.label + ' (' + p.line + ', ' + CALC.rand(p.amount) + '): ' + (p.code === 'AI-05' ? 'needs interpretation beyond the approved rules' : 'a judgement for the Tax Consultant; left out of the calculation') }));
+    const vr = k.variance;
+    const cur = vr && vr.material ? 'TI ' + vr.current : null;
+    // A TAX-05 raised on an earlier figure no longer describes the case: the system withdraws it.
+    openOf(c, 'TAX-05').filter((x) => x.calcRef && /^TI /.test(x.calcRef) && x.calcRef !== cur).forEach((x) => finishResolve(x, sys,
+      'Superseded: taxable income is now ' + CALC.rand(k.summary.taxableIncome) + (cur ? '' : ', no longer a material change on last year'), null));
+    if (cur && !exOf(c).some((x) => x.code === 'TAX-05' && x.calcRef === cur)) {
+      raise(c, 'TAX-05', { by: ai, calcRef: cur, noSettle: true, note: 'Taxable income ' + CALC.rand(vr.current) + ' against ' + CALC.rand(vr.prior) + ' last year (' + (Math.round(vr.ratio * 1000) / 10) + '% change)' });
+    }
+    settle(c);
+    return r;
+  }
+  // The values extracted from the case's documents (simulated) or entered by the Tax Consultant. calculate() reads them.
+  function setInputs(c, a, inputs, o) {
+    o = o || {};
+    if (a.type === 'ai') { const w = aiWhy(a); if (w) return refuse(a, c, 'Extracted values refused', w); }
+    else if (a.type !== 'system') { const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Extracted values refused', w); }
+    if (c.submission && c.submission.ok) return refuse(a, c, 'Extracted values refused', 'The return is submitted; a correction goes through G15 (Request for Correction)');
+    const fl = itr12InFlight(c); if (fl) return refuse(a, c, 'Extracted values refused', 'The ITR12 ' + fl.id + ' may already be with SARS (' + fl.status + '); establish its status first', { sarsTx: fl.id });
+    if (!inputs || !Array.isArray(inputs.lines)) return fail('Give the extracted values as { lines: [...] }');
+    const before = c.inputs ? c.inputs.lines.length : 0;
+    c.inputs = structuredClone(inputs);
+    const docs = new Set(c.inputs.lines.map((l) => l.docId).filter(Boolean));
+    log(a, (o.note || 'Recorded the extracted values') + ': ' + c.inputs.lines.length + ' value' + (c.inputs.lines.length === 1 ? '' : 's') + ' from ' + docs.size + ' document' + (docs.size === 1 ? '' : 's'),
+      Object.assign(cf(c), { before, after: c.inputs.lines.length, result: 'Recorded' }));
+    return okr();
+  }
+  // Drafted answers to a Declaration Questionnaire ('da') or a verification request ('vrf'), each tied to its evidence.
+  function draftResponse(c, a, kind, drafts) {
+    const w = a.type === 'ai' ? aiWhy(a) : staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Draft refused', w);
+    const t = kind === 'da' ? c.da : kind === 'vrf' ? c.vrf : null;
+    if (!t) return fail('No ' + (kind === 'da' ? 'Declaration Questionnaire' : 'verification request') + ' on ' + c.id);
+    if (kind === 'da' && (t.submitted || t.moved)) return fail('The Declaration Questionnaire is already answered or has moved to verification');
+    t.drafts = (drafts || []).map((d) => ({ q: String(d.q || ''), a: String(d.a || ''), evidence: d.evidence || null }));
+    t.draftedBy = whoOf(a); t.draftedAt = now();
+    log(a, 'Drafted ' + t.drafts.length + ' answer' + (t.drafts.length === 1 ? '' : 's') + ' to ' + t.ref + (a.type === 'ai' ? ' for the Tax Consultant to review (simulated)' : ''),
+      Object.assign(cf(c), { sarsRef: t.ref, result: 'Drafted' }));
+    return kind === 'da' ? markReq(c, 'G10', 'draft', a) : okr();
+  }
+  // The Tax Consultant's decision on a judgement item: the amount and the treatment, authority or rationale. calculate() then uses it.
+  function decideItem(c, lineId, a, o) {
+    o = o || {};
+    const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Decision refused', w);
+    if (c.submission && c.submission.ok) return refuse(a, c, 'Decision refused', 'The return is submitted; a correction goes through G15 (Request for Correction)');
+    const fl = itr12InFlight(c); if (fl) return refuse(a, c, 'Decision refused', 'The ITR12 ' + fl.id + ' may already be with SARS (' + fl.status + '); establish its status first', { sarsTx: fl.id });
+    const l = c.inputs && (c.inputs.lines || []).find((x) => x.id === lineId); if (!l) return fail('No extracted value ' + lineId);
+    const f = typeof CALC !== 'undefined' ? CALC.FIELDS[l.field] : null;
+    if (!f || !f.judgement) return fail(lineId + ' is not a judgement item');
+    const rationale = String(o.rationale || '').trim();
+    if (!rationale) return refuse(a, c, 'Decision refused', 'Record the treatment, the authority or rationale, and the conclusion');
+    const amount = o.amount == null ? l.amount : Number(o.amount);
+    if (!isFinite(amount) || (amount < 0 && !f.signed)) return refuse(a, c, 'Decision refused', 'Give a valid amount');
+    const before = l.amount; l.amount = amount; l.decided = { by: a.id, at: now(), rationale };
+    log(a, 'Decided ' + f.label + ' (' + l.id + '): ' + CALC.rand(amount) + '. ' + rationale, Object.assign(cf(c), { before, after: amount, reason: rationale, result: 'Decided' }));
+    return okr();
+  }
+
   /* ===================== drive(): the happy path, used by the tests and the seed ===================== */
   // Moves a case forward with the right actor at each gate until `until` is the current gate. Options: answers, data, route, decision.
   function stubData(c) {
@@ -1668,7 +1784,11 @@ const ENGINE = (() => {
           c.items.forEach((it) => { if (itemState(c, it) === 'requested') upload(c, it.id, { name: FILE_FOR[it.kind] || (it.kind + '_2026.pdf'), size: 245760 }, ACTOR.client(c.clientId)); });
           r = c.gates.G04.status === 'released' ? okr() : release(c, 'G04', tc); break;
         case 'G05':
-          if (!c.calc || !c.versions.length || c.calc.ruleset !== S.rulesetVersion) { const ch = change(c, tc, o.data || stubData(c), { reason: o.data ? 'Calculation' : 'Calculation (test stub)' }); if (!ch.ok) { r = ch; break; } }
+          if (!c.calc || !c.versions.length || c.calc.ruleset !== S.rulesetVersion || c.rerun || calcStale(c)) {
+            const ch = o.data ? change(c, tc, o.data, { reason: 'Calculation' })
+              : c.inputs && typeof CALC !== 'undefined' ? calculate(c, tc) : change(c, tc, stubData(c), { reason: 'Calculation (test stub)' });
+            if (!ch.ok) { r = ch; break; }
+          }
           r = release(c, 'G05', tc); break;
         case 'G06': r = portal(c, 'approve', { version: vN(c), declaration: true }); break;
         case 'G07': r = fail('G07 did not release: ' + canRelease(c, 'G07', ACTOR.system()).why); break;
@@ -1709,7 +1829,7 @@ const ENGINE = (() => {
     raise, raiseManual, resolve, close, resolverCheck, resolveGuard, setSeverity, approveSeverity, eligibleWhy, overrideWhy, requestOverride, approveOverride,
     setOverridable, recordFallback, reconcileFallback,
     // versions
-    change, outsideEdit, restoreVersion,
+    change, outsideEdit, restoreVersion, calculate, decideItem, setInputs, draftResponse,
     // SARS link and inbound
     requestTx, g18Checks, g18Blockers, signG18, transmit, checkStatus, retry, manualFallback, receive, routeInbound, confirmInboundDate, remedyDeadline,
     // documents, portal and withdrawals

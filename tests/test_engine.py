@@ -18,6 +18,7 @@ import pytest
 
 HELPERS = r"""
 () => {
+  if (typeof DEMO !== 'undefined') DEMO.cases = false;  // the engine is tested on an empty firm; tests/test_seed.py covers the demo cases
   const H = {
     tc: ACTOR.as('Tax Consultant', 'TC1'), tc2: ACTOR.as('Tax Consultant', 'TC2'), ad: ACTOR.as('Administrator', 'AD1'),
     ia: ACTOR.as('Integration Administrator', 'IA1'), io: ACTOR.as('Information Officer', 'IO1'), rc: ACTOR.as('Records/Compliance Owner', 'RC1'),

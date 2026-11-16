@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-build="20261116T113233Z"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="description" content="Operon partner preview: the ITR12 workflow with made-up data and simulated logins.">
+<html lang="en" data-build="20261116T123222Z"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="description" content="Operon partner preview: the ITR12 workflow with made-up data and simulated logins.">
 <title>Operon · ITR12 partner preview</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2151,6 +2151,395 @@ const DATES = (() => {
   return { DAY, dt, add, iso, easter, holidays, EXTRA, isChapter9, biz, nextBiz, addBusinessDays, businessDaysBetween, verification21, countRange, fromLocal, toLocal, holidayName };
 })();
 
+/* ===================== itr12/ruleset-2026.js ===================== */
+/* Tax rulesets for individuals. Every value names its sources (RULESET_SRC) and the date it was checked against them.
+   2026.1 is the approved ruleset for the 2026 year of assessment (1 March 2025 to 28 February 2026).
+   2027.1 holds the 2027 values; the preview loads it only to demonstrate a wrong-year configuration (TAX-06).
+   The tax thresholds are not stored: CALC.threshold() derives them from the brackets and rebates, and tests/test_calc.py
+   checks the result against the thresholds SARS publishes. */
+const RULESET_SRC = {
+  rates: { title: 'SARS: Rates of tax for individuals', url: 'https://www.sars.gov.za/tax-rates/income-tax/rates-of-tax-for-individuals/' },
+  mtc: { title: 'SARS: Medical tax credit rates', url: 'https://www.sars.gov.za/tax-rates/medical-tax-credit-rates/' },
+  it07: { title: 'SARS Guide IT07: Determination of Medical Tax Credits (Issue 18)', url: 'https://www.sars.gov.za/wp-content/uploads/Ops/Guides/Legal-Pub-Guide-IT07-Guide-on-the-Determination-of-Medical-Tax-Credits.pdf' },
+  guide25: { title: 'Budget 2025 Tax Guide (National Treasury and SARS)', url: 'https://archive.treasury.gov.za/documents/National%20Budget/2025Mar/sars/Budget%202025%20Tax%20Guide.pdf' },
+  guide26: { title: 'Budget 2026 Tax Guide (National Treasury and SARS)', url: 'https://archive.treasury.gov.za/documents/national%20budget/2026/sars/Budget%202026%20Tax%20guide.pdf' },
+  cgtExclusion: { title: 'SARS: Capital gains tax, annual exclusion', url: 'https://www.sars.gov.za/types-of-tax/capital-gains-tax/proceeds/calculation-of-taxable-capital-gains-and-assessed-capital-losses/annual-exclusion/' },
+  cgtInclusion: { title: 'SARS: Capital gains tax, inclusion rate', url: 'https://www.sars.gov.za/types-of-tax/capital-gains-tax/proceeds/calculation-of-taxable-capital-gains-and-assessed-capital-losses/inclusion-rate/' },
+  cgt02: { title: 'SARS Guide CGT02: Basic Guide to Capital Gains Tax for Individuals (Issue 13)', url: 'https://www.sars.gov.za/wp-content/uploads/Ops/Guides/Legal-Pub-Guide-CGT02-ABC-Guide-on-CGT-for-Individuals.pdf' },
+  faqCgt: { title: 'SARS FAQ: the effect of CGT on the donations, medical and retirement fund deductions', url: 'https://www.sars.gov.za/faq/faq-what-will-the-effect-of-cgt-be-when-calculating-the-deduction-for-donations-medical-and-retirement-fund-contributions/' },
+  // The Act's own text, for the rules the guides only summarise (consolidated text published by Acts Online).
+  actS11f: { title: 'Income Tax Act 58 of 1962, s11F (the three limits in s11F(2) and the carry-forward in s11F(3))', url: 'https://api.acts.co.za/income-tax-act-1962/11f__deduction_in_respect_of_c.php' },
+  actS18a: { title: 'Income Tax Act 58 of 1962, s18A(1) (the 10% limit and the carry-forward)', url: 'https://api.acts.co.za/income-tax-act-1962/18a__deduction_of_donations_to_certain_public_benefit_organisations.php' },
+  act8: { title: 'Income Tax Act 58 of 1962, Eighth Schedule Part II (annual exclusion, aggregate gain or loss, inclusion rate in para 10(1)(a))', url: 'https://api.acts.co.za/income-tax-act-1962/sch8_part_ii__taxable_capital_gains_and_assessed_capital_losses.php' },
+  // The 2027 s11F cap and CGT exclusions are announced amounts, in the Rates and Monetary Amounts Bill introduced on 21 October 2026.
+  ratesBill26: { title: 'Rates and Monetary Amounts and Amendment of Revenue Laws Bill [B34-2026]', url: 'https://www.parliament.gov.za/storage/app/media/Bills/2026/B34-2026_Rates_and_Monetary_Amounts.pdf' },
+};
+
+const RULESETS = (() => {
+  const freeze = (o) => { Object.values(o).forEach((v) => { if (v && typeof v === 'object') freeze(v); }); return Object.freeze(o); };
+  // Brackets: [taxable income above, rate on the amount above it, tax on the amount up to it], as SARS publishes them.
+  const r2026 = {
+    version: '2026.1', year: 2026, period: '1 March 2025 to 28 February 2026', yearEnd: '2026-02-28', checked: '2026-11-09',
+    brackets: [[0, 0.18, 0], [237100, 0.26, 42678], [370500, 0.31, 77362], [512800, 0.36, 121475], [673000, 0.39, 179147], [857900, 0.41, 251258], [1817000, 0.45, 644489]],
+    rebates: { primary: 17235, secondary: 9444, tertiary: 3145 },             // secondary from age 65, tertiary from 75 (age on the last day of the year)
+    mtc: { main: 364, first: 364, additional: 246 },                           // s6A, per month
+    s6b: { rate: 0.25, rateSenior: 0.333, multiple: 4, multipleSenior: 3, floor: 0.075 },  // s6B(3); "senior" = 65 or older, or a disability
+    interestExemption: { under65: 23800, over65: 34500 },                     // s10(1)(i), local interest only
+    s11f: { rate: 0.275, cap: 350000 },
+    cgt: { exclusion: 40000, deathExclusion: 300000, inclusion: 0.4 },  // the death exclusion is recorded but unused: deceased estates go to the consultant (AI-05)
+    s18a: { rate: 0.1 },
+    src: {
+      brackets: ['rates', 'guide25'], rebates: ['rates', 'guide25'], mtc: ['mtc', 'it07', 'guide25'], s6b: ['it07'],
+      interestExemption: ['guide25'], s11f: ['actS11f', 'faqCgt', 'guide25'], cgt: ['cgtExclusion', 'act8', 'guide25'], s18a: ['actS18a', 'guide25', 'faqCgt'],
+    },
+  };
+  const r2027 = {
+    version: '2027.1', year: 2027, period: '1 March 2026 to 28 February 2027', yearEnd: '2027-02-28', checked: '2026-11-09',
+    brackets: [[0, 0.18, 0], [245100, 0.26, 44118], [383100, 0.31, 79998], [530200, 0.36, 125599], [695800, 0.39, 185215], [887000, 0.41, 259783], [1878600, 0.45, 666339]],
+    rebates: { primary: 17820, secondary: 9765, tertiary: 3249 },
+    mtc: { main: 376, first: 376, additional: 254 },
+    s6b: { rate: 0.25, rateSenior: 0.333, multiple: 4, multipleSenior: 3, floor: 0.075 },
+    interestExemption: { under65: 23800, over65: 34500 },
+    s11f: { rate: 0.275, cap: 430000 },
+    cgt: { exclusion: 50000, deathExclusion: 440000, inclusion: 0.4 },
+    s18a: { rate: 0.1 },
+    src: {
+      brackets: ['rates', 'guide26'], rebates: ['rates', 'guide26'], mtc: ['mtc', 'guide26'], s6b: ['it07'],
+      interestExemption: ['guide26'], s11f: ['actS11f', 'guide26', 'ratesBill26'], cgt: ['guide26', 'ratesBill26', 'act8'], s18a: ['actS18a', 'guide26'],
+    },
+  };
+  return freeze({ '2026.1': r2026, '2027.1': r2027 });
+})();
+// The approved ruleset for the 2026 filing season. The engine starts S.rulesetVersion from RULESET.version.
+const RULESET = RULESETS['2026.1'];
+
+/* ===================== itr12/calc.js ===================== */
+/* The income tax calculation for an individual (ITR12), from the values extracted from the case's documents.
+   CALC.compute(inputs, profile, ruleset) and CALC.forCase(c) are pure: they never change the case or the state.
+   Lineage: document → extracted value (an input line: docId, ref, amount) → tax category → calculator field → calculation line.
+   Judgement items (home office, travel, trade, foreign income, trusts, a deceased taxpayer) are never calculated by the preview:
+   until the Tax Consultant records the amount and the rationale (line.decided), they are left out and listed in calc.pending with
+   the code the engine raises (TAX-02, or AI-05 where interpretation goes beyond the approved rules).
+
+   Order of the calculation (Income Tax Act):
+     income = employment income + local interest − interest exemption (s10(1)(i)) + net rental + decided other income
+     less decided deductions (home office, travel)                                  → "before s11F", excluding capital gains
+     taxable capital gain (Eighth Schedule paras 5-10): aggregate gain less the annual exclusion, less any assessed capital loss
+       brought forward, × the inclusion rate; a loss is reduced by the exclusion and carried forward
+     s11F(2) = lowest of: the cap; 27.5% × the greater of remuneration and (before s11F + taxable capital gain); before s11F
+     s18A = 10% × taxable income before s18A (capital gain included)
+     normal tax on taxable income; less rebates (s6), s6A and s6B credits, other credits, each limited to the tax left
+     result = tax after credits − PAYE − provisional tax paid (positive: payable; negative: refund) */
+const CALC = (() => {
+  const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
+  // Calculator fields: the tax category each extracted value belongs to, how it is used, and which documents it may come from.
+  const FIELDS = {
+    remuneration:     { cat: 'Employment income', label: 'Remuneration', use: 'employment', kinds: ['irp5'] },
+    medicalFringe:    { cat: 'Employment income', label: 'Employer-paid medical scheme fees (taxable fringe benefit)', use: 'employment', kinds: ['irp5'] },
+    paye:             { cat: 'Tax paid', label: 'Employees’ tax (PAYE)', use: 'paye', kinds: ['irp5'] },
+    provisionalPaid:  { cat: 'Tax paid', label: 'Provisional tax paid', use: 'provisional', kinds: ['notice'], sars: true },
+    interest:         { cat: 'Local interest', label: 'Local interest', use: 'interest', kinds: ['it3b'] },
+    dividends:        { cat: 'Local dividends', label: 'Local dividends (exempt)', use: 'exempt', kinds: ['it3b'] },
+    rentalIncome:     { cat: 'Rental', label: 'Rental income', use: 'rental', kinds: ['rental'] },
+    rentalExpenses:   { cat: 'Rental', label: 'Rental expenses', use: 'rentalCost', kinds: ['rental'] },
+    capitalGain:      { cat: 'Capital gains', label: 'Capital gain or loss on a disposal', use: 'cgt', kinds: ['it3c'], signed: true },
+    retirementFund:   { cat: 'Retirement fund contributions (s11F)', label: 'Pension or provident fund contributions', use: 's11f', kinds: ['irp5'] },
+    ra:               { cat: 'Retirement fund contributions (s11F)', label: 'Retirement annuity contributions', use: 's11f', kinds: ['ra', 'irp5'] },
+    medicalFees:      { cat: 'Medical (s6A and s6B)', label: 'Medical scheme fees paid by the taxpayer, including employer-paid fees taxed as a fringe benefit', use: 'fees', kinds: ['medical'] },
+    medicalExpenses:  { cat: 'Medical (s6B)', label: 'Qualifying medical expenses not recovered', use: 'expenses', kinds: ['medical'] },
+    donations:        { cat: 'Donations (s18A)', label: 'Donations with s18A receipts', use: 's18a', kinds: ['donation'] },
+    homeOffice:       { cat: 'Home office', label: 'Home office expenses', use: 'deduction', kinds: ['homeoffice'], judgement: 'TAX-02' },
+    travel:           { cat: 'Travel', label: 'Business travel (logbook)', use: 'deduction', kinds: ['logbook'], judgement: 'TAX-02' },
+    trade:            { cat: 'Trade', label: 'Trade income (net)', use: 'other', kinds: null, judgement: 'TAX-02', signed: true },
+    foreignIncome:    { cat: 'Foreign income', label: 'Foreign income', use: 'other', kinds: ['foreign'], judgement: 'AI-05', signed: true },
+    foreignTaxCredit: { cat: 'Foreign income', label: 'Foreign tax credit (s6quat)', use: 'credit', kinds: ['foreign'], judgement: 'AI-05' },
+    trust:            { cat: 'Trust distributions', label: 'Trust distribution', use: 'other', kinds: null, judgement: 'AI-05', signed: true },
+  };
+  const fieldOf = (k) => (own(FIELDS, k) ? FIELDS[k] : null);
+  const rulesetOf = (v) => (own(RULESETS, v) ? RULESETS[v] : null);
+  // Document kinds whose values belong in the calculation: a validated one with no extracted value fails the reconciliation.
+  const FEEDS = ['irp5', 'it3b', 'it3c', 'medical', 'ra', 'rental', 'logbook', 'homeoffice', 'donation', 'foreign'];
+
+  // Rounding to the cent, half away from zero on the decimal value (toPrecision strips binary noise), never −0.
+  const r2 = (x) => { const v = Math.round(Number((Math.abs(x) * 100).toPrecision(15))) / 100; return v === 0 ? 0 : (x < 0 ? -v : v); };
+  // Truncation to the cent, as SARS's worked examples do for the s6B credit (IT07).
+  const t2 = (x) => Math.floor(Number((Math.max(0, x) * 100).toPrecision(15))) / 100;
+  const cents = (a) => Math.abs(Number((a * 100).toPrecision(15)) - Math.round(a * 100)) < 1e-6;
+  const rand = (n) => { const [i, d] = Math.abs(n).toFixed(2).split('.'); return (n < 0 ? '−R' : 'R') + i.replace(/\B(?=(\d{3})+$)/g, ',') + '.' + d; };
+  const pct = (x) => r2(x * 100) + '%';
+
+  // Normal tax from the brackets: base of the highest bracket the income passes, plus its rate on the amount above it.
+  function bracketTax(rs, ti) {
+    if (!(ti > 0)) return 0;
+    const row = rs.brackets.slice().reverse().find((b) => ti > b[0]);
+    return r2(row[2] + row[1] * (ti - row[0]));
+  }
+  // The tax threshold: the taxable income at which normal tax equals the rebates (rounded up to the rand, as SARS publishes it).
+  function threshold(rs, age) {
+    if (!(typeof age === 'number' && age >= 0)) return null;
+    const reb = rs.rebates.primary + (age >= 65 ? rs.rebates.secondary : 0) + (age >= 75 ? rs.rebates.tertiary : 0);
+    const rows = rs.brackets;
+    for (let i = 0; i < rows.length; i++) {
+      const next = rows[i + 1];
+      if (!next || reb < next[2]) return Math.ceil(rows[i][0] + (reb - rows[i][2]) / rows[i][1] - 1e-6) || 0;
+    }
+    return null;
+  }
+
+  // Dates of birth and age on the last day of the year of assessment.
+  const realDate = (y, m, d) => { const x = new Date(Date.UTC(y, m - 1, d)); return x.getUTCFullYear() === y && x.getUTCMonth() === m - 1 && x.getUTCDate() === d ? x.toISOString().slice(0, 10) : null; };
+  const yearEnd = (year) => (Number.isInteger(year) ? new Date(Date.UTC(year, 2, 0)).toISOString().slice(0, 10) : null);
+  function ageOn(dob, iso) {
+    if (!dob || !iso) return null;
+    const [y, m, d] = dob.split('-').map(Number); const [Y, M, D] = iso.split('-').map(Number);
+    return Y - y - (M < m || (M === m && D < d) ? 1 : 0);
+  }
+  // The client's recorded date of birth when it is a real date; otherwise the first six digits of the SA ID number (YYMMDD).
+  // The ID gives no century: a 20xx reading after the year end is 19xx; a reading that makes the filer younger than 16 could
+  // equally be a centenarian, so the date of birth must then be recorded (null here).
+  function dobOf(cl, year) {
+    if (cl && cl.dob) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(cl.dob); const d = m && realDate(+m[1], +m[2], +m[3]); if (d) return d; }
+    const m = /^(\d{2})(\d{2})(\d{2})\d{7}$/.exec(String((cl && cl.idNo) || ''));
+    if (!m || !Number.isInteger(year)) return null;
+    const yy = +m[1]; const end = yearEnd(year);
+    const d1900 = realDate(1900 + yy, +m[2], +m[3]);
+    if (yy > year % 100) return d1900;
+    const d2000 = realDate(2000 + yy, +m[2], +m[3]);
+    if (!d2000 || d2000 > end) return d1900;
+    return ageOn(d2000, end) < 16 ? null : d2000;
+  }
+  function profileOf(cl, year, inputs) {
+    const end = yearEnd(year); const dob = dobOf(cl, year);
+    return { year, yearEnd: end, dob, age: ageOn(dob, end), disability: !!(inputs && inputs.medical && inputs.medical.disability), deceased: !!(cl && cl.deceased) };
+  }
+
+  const ZERO = () => ({ taxableIncome: 0, normalTax: 0, rebates: 0, medicalCredits: 0, paye: 0, provisional: 0, otherCredits: 0, result: 0 });
+  const mtcFor = (rs, deps) => rs.mtc.main + (deps >= 1 ? rs.mtc.first : 0) + Math.max(0, deps - 1) * rs.mtc.additional;
+
+  function compute(inputs, prof, rs, version) {
+    inputs = inputs && typeof inputs === 'object' ? inputs : {};
+    const errors = []; const pending = []; const used = [];
+    const ver = rs ? rs.version : (version || null);
+    if (!rs) errors.push('Ruleset ' + (version || '(none)') + ' is not defined');
+    if (!Number.isInteger(prof.year)) errors.push('The case has no valid year of assessment');
+    else if (prof.age == null) errors.push('The age cannot be determined: record the date of birth (the ID number does not settle it)');
+    // A ruleset for another year is not a validation error (TAX-01) but a configuration error (TAX-06): the engine raises it.
+    const wrongYear = !!(rs && Number.isInteger(prof.year) && rs.year !== prof.year);
+    const seen = new Set();
+    (Array.isArray(inputs.lines) ? inputs.lines : []).forEach((l, i) => {
+      if (!l || typeof l !== 'object') { errors.push('Extracted value ' + (i + 1) + ' is empty'); return; }
+      const f = fieldOf(l.field);
+      if (!l.id || seen.has(l.id)) { errors.push('Every extracted value needs its own id' + (l.id ? ': ' + l.id + ' is used twice' : '')); return; }
+      seen.add(l.id);
+      if (!f) { errors.push(l.id + ': unknown calculator field ' + l.field); return; }
+      if (typeof l.amount !== 'number' || !isFinite(l.amount)) { errors.push(l.id + ': ' + f.label + ' is not a number'); return; }
+      if (!cents(l.amount)) { errors.push(l.id + ': ' + f.label + ' is not a whole number of cents'); return; }
+      if (l.amount < 0 && !f.signed) { errors.push(l.id + ': ' + f.label + ' cannot be negative'); return; }
+      if (f.judgement && !(l.decided && l.decided.by && String(l.decided.rationale || '').trim())) {
+        pending.push({ line: l.id, field: l.field, label: f.label, amount: r2(l.amount), code: f.judgement }); return;
+      }
+      used.push(l);
+    });
+    // Medical scheme membership: months and dependants, or periods of { months, dependants } when the cover changed in the year,
+    // and the taxpayer's share of the fees when someone else paid part of them (s6A(3A)).
+    const med = inputs.medical && typeof inputs.medical === 'object' ? inputs.medical : {};
+    const periods = Array.isArray(med.periods) && med.periods.length ? med.periods
+      : [{ months: med.months == null ? 0 : med.months, dependants: med.dependants == null ? 0 : med.dependants }];
+    periods.forEach((p) => {
+      if (!(p && Number.isInteger(p.months) && p.months >= 0 && p.months <= 12)) errors.push('Medical scheme months must be a whole number from 0 to 12');
+      if (!(p && Number.isInteger(p.dependants) && p.dependants >= 0)) errors.push('The number of medical scheme dependants must be a whole number');
+    });
+    const months = periods.reduce((a, p) => a + ((p && Number.isInteger(p.months)) ? p.months : 0), 0);
+    if (months > 12) errors.push('The medical scheme periods add up to more than 12 months');
+    const share = med.share == null ? 1 : med.share;
+    if (!(typeof share === 'number' && share > 0 && share <= 1)) errors.push('The share of the medical scheme fees must be more than 0 and at most 1');
+    const carried = inputs.carried && typeof inputs.carried === 'object' ? inputs.carried : {};
+    const cf = (k) => { const v = carried[k]; if (v == null) return 0; if (typeof v === 'number' && v >= 0 && cents(v)) return v; errors.push('Carried-forward ' + k + ' must be zero or a positive amount in cents'); return 0; };
+    const cfS11f = cf('s11f'); const cfS18a = cf('s18a'); const cfLoss = cf('capitalLoss');
+    if (prof.deceased) pending.push({ line: 'deceased', field: null, label: 'Deceased taxpayer: the year of assessment ends on the date of death', amount: 0, code: 'AI-05' });
+
+    const tot = (use) => r2(used.filter((l) => FIELDS[l.field].use === use).reduce((a, l) => a + l.amount, 0));
+    const ids = (...uses) => used.filter((l) => uses.includes(FIELDS[l.field].use)).map((l) => l.id);
+    const lines = []; const put = (key, label, amount, basis, from) => { const v = r2(amount); lines.push({ key, label, amount: v, basis: basis || '', from: from || [] }); return v; };
+    if (!rs || prof.age == null || !Number.isInteger(prof.year) || prof.deceased) {
+      return { ruleset: ver, year: rs ? rs.year : null, summary: ZERO(), lines, pending, errors, wrongYear, profile: prof, schedules: null, used };
+    }
+
+    const senior = prof.age >= 65; const over75 = prof.age >= 75;
+    const fees = tot('fees'); const exp = tot('expenses');
+    if (fees > 0 && !months) errors.push('Medical scheme fees are recorded but no months of membership');
+    // Income
+    const emp = put('employment', 'Employment income', tot('employment'), 'Remuneration and taxable fringe benefits from the IRP5', ids('employment'));
+    const intGross = put('interest', 'Local interest', tot('interest'), '', ids('interest'));
+    const exLimit = senior ? rs.interestExemption.over65 : rs.interestExemption.under65;
+    const intEx = Math.min(intGross, exLimit);
+    put('interestExempt', 'Less: interest exemption', -intEx, 's10(1)(i): up to ' + rand(exLimit) + (senior ? ' (65 or older)' : ' (under 65)'));
+    const rentIn = tot('rental'); const rentOut = tot('rentalCost');
+    const rental = put('rental', 'Net rental income', rentIn - rentOut, rand(rentIn) + ' income less ' + rand(rentOut) + ' expenses', ids('rental', 'rentalCost'));
+    const other = put('otherIncome', 'Other income (Tax Consultant’s decision)', tot('other'), 'Judgement items with a recorded decision', ids('other'));
+    const income = put('income', 'Income', emp + intGross - intEx + rental + other, 'Gross income less exempt income');
+    const ded = tot('deduction');
+    put('deductions', 'Less: deductions (Tax Consultant’s decision)', -ded, 'Judgement items with a recorded decision', ids('deduction'));
+    const beforeRf = r2(income - ded);
+    // Capital gains (Eighth Schedule): the annual exclusion, then any assessed capital loss brought forward, then the inclusion rate.
+    const agg = put('capitalGains', 'Aggregate capital gain or loss', tot('cgt'), 'Sum of the gains and losses on disposals', ids('cgt'));
+    const excl = rs.cgt.exclusion;
+    const aggGain = agg > 0 ? Math.max(0, agg - excl) : 0;
+    const aggLoss = agg < 0 ? Math.max(0, -agg - excl) : 0;
+    const netGain = r2(Math.max(0, aggGain - cfLoss));
+    const lossCarried = r2(aggLoss + Math.max(0, cfLoss - aggGain));
+    let cgBasis;
+    if (!agg && !cfLoss) cgBasis = 'No disposals';
+    else if (agg < 0) cgBasis = 'Loss of ' + rand(-agg) + ' reduced by the ' + rand(excl) + ' annual exclusion' + (cfLoss ? ', plus ' + rand(cfLoss) + ' brought forward' : '') + ': assessed capital loss of ' + rand(lossCarried) + ' carried forward';
+    else if (agg <= excl && !cfLoss) cgBasis = 'Gain of ' + rand(agg) + ' within the ' + rand(excl) + ' annual exclusion';
+    else cgBasis = '(' + rand(agg) + ' less the ' + rand(excl) + ' annual exclusion' + (cfLoss ? ' and the ' + rand(cfLoss) + ' assessed capital loss brought forward' : '') + ') × ' + pct(rs.cgt.inclusion) + ' inclusion rate' + (lossCarried ? '; ' + rand(lossCarried) + ' still carried forward' : '');
+    const tcg = put('taxableCapitalGain', 'Taxable capital gain', netGain * rs.cgt.inclusion, cgBasis);
+    // Retirement fund contributions (s11F)
+    const contrib = r2(tot('s11f') + cfS11f);
+    const base27 = Math.max(emp, beforeRf + tcg);
+    const lim = { cap: rs.s11f.cap, pct: r2(rs.s11f.rate * base27), ti: Math.max(0, beforeRf) };
+    const d11f = Math.min(contrib, lim.cap, lim.pct, lim.ti);
+    put('s11f', 'Less: retirement fund contributions (s11F)', -d11f,
+      contrib ? 'Lowest of ' + rand(lim.cap) + ', ' + pct(rs.s11f.rate) + ' of ' + rand(base27) + ' (' + rand(lim.pct) + ') and ' + rand(lim.ti) + '; contributions ' + rand(contrib) : 'No contributions', ids('s11f'));
+    // Donations (s18A)
+    const before18a = r2(beforeRf - d11f + tcg);
+    const don = r2(tot('s18a') + cfS18a);
+    const lim18a = r2(Math.max(0, rs.s18a.rate * before18a));
+    const d18a = Math.min(don, lim18a);
+    put('s18a', 'Less: donations (s18A)', -d18a, don ? 'Up to ' + pct(rs.s18a.rate) + ' of ' + rand(before18a) + ' (' + rand(lim18a) + '); donated ' + rand(don) : 'No donations', ids('s18a'));
+    const tiRaw = r2(before18a - d18a);
+    const ti = put('taxableIncome', 'Taxable income', Math.max(0, tiRaw), tiRaw < 0 ? 'Assessed loss of ' + rand(-tiRaw) + ' carried forward' : '');
+    // Tax
+    const row = ti > 0 ? rs.brackets.slice().reverse().find((b) => ti > b[0]) : rs.brackets[0];
+    const nt = put('normalTax', 'Normal tax', bracketTax(rs, ti), ti > 0 ? rand(row[2]) + ' + ' + pct(row[1]) + ' of the amount above ' + rand(row[0]) : 'No taxable income');
+    const rebFull = rs.rebates.primary + (senior ? rs.rebates.secondary : 0) + (over75 ? rs.rebates.tertiary : 0);
+    const reb = Math.min(rebFull, nt);
+    put('rebates', 'Less: rebates', -reb, 'Primary ' + rand(rs.rebates.primary) + (senior ? ' + secondary ' + rand(rs.rebates.secondary) : '') + (over75 ? ' + tertiary ' + rand(rs.rebates.tertiary) : '') +
+      ' (age ' + prof.age + ' on ' + prof.yearEnd + ')' + (reb < rebFull ? '; limited to the normal tax' : ''));
+    let left = r2(nt - reb);
+    // Medical credits: s6A per month of membership (apportioned by the share of the fees paid), then s6B (truncated to the cent).
+    const s6aFull = fees > 0 ? r2(periods.reduce((a, p) => a + mtcFor(rs, p.dependants) * p.months, 0)) : 0;
+    const s6a = r2(s6aFull * share);
+    const s6aUsed = Math.min(s6a, left); left = r2(left - s6aUsed);
+    const seniorMed = senior || !!med.disability;
+    const feesOver = seniorMed ? Math.max(0, fees - rs.s6b.multipleSenior * s6a) : Math.max(0, fees - rs.s6b.multiple * s6a);
+    const s6b = seniorMed ? t2(rs.s6b.rateSenior * feesOver + rs.s6b.rateSenior * exp) : t2(rs.s6b.rate * Math.max(0, feesOver + exp - rs.s6b.floor * ti));
+    const s6bUsed = Math.min(s6b, left); left = r2(left - s6bUsed);
+    const per = periods.length === 1 ? rand(mtcFor(rs, periods[0].dependants)) + ' a month × ' + months + ' months'
+      : periods.map((p) => rand(mtcFor(rs, p.dependants)) + ' × ' + p.months + ' months').join(' + ');
+    put('s6a', 'Less: medical scheme fees tax credit (s6A)', -s6aUsed,
+      fees > 0 && !months ? 'Fees recorded but no months of membership' : !fees ? 'No medical scheme fees'
+        : per + (share < 1 ? ' × ' + pct(share) + ' share of the fees (s6A(3A))' : '') + (s6aUsed < s6a ? '; limited to the tax left' : ''), ids('fees'));
+    const limitedNote = s6bUsed < s6b ? '; limited to the tax left' : '';
+    put('s6b', 'Less: additional medical expenses tax credit (s6B)', -s6bUsed, seniorMed
+      ? pct(rs.s6b.rateSenior) + ' × excess fees ' + rand(feesOver) + ' (fees ' + rand(fees) + ' − ' + rs.s6b.multipleSenior + ' × ' + rand(s6a) + ', not below nil) + ' + pct(rs.s6b.rateSenior) + ' × expenses ' + rand(exp) + (senior ? ' (65 or older)' : ' (disability)') + limitedNote
+      : pct(rs.s6b.rate) + ' × (excess fees ' + rand(feesOver) + ' (fees ' + rand(fees) + ' − ' + rs.s6b.multiple + ' × ' + rand(s6a) + ', not below nil) + expenses ' + rand(exp) + ' − ' + pct(rs.s6b.floor) + ' × ' + rand(ti) + ', not below nil)' + limitedNote,
+      ids('fees', 'expenses'));
+    const credit = tot('credit'); const oc = Math.min(credit, left); left = r2(left - oc);
+    put('otherCredits', 'Less: other credits (Tax Consultant’s decision)', -oc, credit ? (oc < credit ? 'Limited to the tax left' : 'Recorded by the Tax Consultant') : '', ids('credit'));
+    const liability = put('liability', 'Tax after rebates and credits', left);
+    const paye = put('paye', 'Less: PAYE', -tot('paye'), '', ids('paye'));
+    const prov = put('provisional', 'Less: provisional tax paid', -tot('provisional'), '', ids('provisional'));
+    const result = put('result', tot('paye') + tot('provisional') > liability ? 'Refund due' : 'Amount payable', liability + paye + prov, 'Positive: payable to SARS; negative: refund');
+    const summary = { taxableIncome: ti, normalTax: nt, rebates: r2(reb), medicalCredits: r2(s6aUsed + s6bUsed), paye: tot('paye'), provisional: tot('provisional'), otherCredits: r2(oc), result };
+    const schedules = {
+      employment: { remuneration: emp, paye: tot('paye'), lines: ids('employment', 'paye') },
+      interest: { gross: intGross, exempt: r2(intEx), taxable: r2(intGross - intEx), limit: exLimit, lines: ids('interest') },
+      dividends: { exempt: tot('exempt'), lines: ids('exempt') },
+      rental: { income: rentIn, expenses: rentOut, net: rental, lines: ids('rental', 'rentalCost') },
+      cgt: { aggregate: agg, exclusion: excl, broughtForward: cfLoss, net: netGain, inclusion: rs.cgt.inclusion, taxable: tcg, lossCarried, lines: ids('cgt') },
+      retirement: { contributions: contrib, limits: lim, deduction: r2(d11f), carriedForward: r2(contrib - d11f), lines: ids('s11f') },
+      donations: { donated: don, limit: lim18a, deduction: r2(d18a), carriedForward: r2(don - d18a), lines: ids('s18a') },
+      medical: { months, periods: periods.map((p) => ({ months: p.months, dependants: p.dependants })), share, disability: !!med.disability, senior: seniorMed,
+        fees, s6a, expenses: exp, s6b, s6aUsed: r2(s6aUsed), s6bUsed: r2(s6bUsed), lines: ids('fees', 'expenses') },
+      assessedLoss: tiRaw < 0 ? r2(-tiRaw) : 0,
+      judgement: used.filter((l) => FIELDS[l.field].judgement).map((l) => ({ line: l.id, field: l.field, amount: r2(l.amount), decided: l.decided }))
+        .concat(pending.filter((p) => p.field).map((p) => ({ line: p.line, field: p.field, amount: p.amount, decided: null }))),
+    };
+    return { ruleset: rs.version, year: rs.year, summary, lines, pending, errors, wrongYear, profile: prof, schedules, used };
+  }
+
+  // The ITR12 draft: what the firm declares (SARS assesses the tax). One entry per calculator field with its source lines.
+  function itr12Of(c, cl, r, inputs) {
+    const decl = Object.create(null); const raw = Object.create(null);
+    r.used.forEach((l) => {
+      const f = FIELDS[l.field];
+      const e = decl[l.field] || (decl[l.field] = { label: f.label, category: f.cat, amount: 0, lines: [] });
+      raw[l.field] = (raw[l.field] || 0) + l.amount; e.amount = r2(raw[l.field]); e.lines.push(l.id);
+    });
+    const med = (inputs && inputs.medical) || {};
+    const periods = Array.isArray(med.periods) && med.periods.length ? med.periods : [{ months: med.months || 0, dependants: med.dependants || 0 }];
+    return { taxRef: cl ? cl.taxRef : null, year: c.year, declared: Object.assign({}, decl),
+      medical: { months: periods.reduce((a, p) => a + (p.months || 0), 0), periods: periods.map((p) => ({ months: p.months || 0, dependants: p.dependants || 0 })),
+        share: med.share == null ? 1 : med.share, disability: !!med.disability } };
+  }
+
+  // Documents ↔ extracted values ↔ calculation ↔ ITR12. Issues fail the reconciliation (PRE-01 at G08).
+  function reconcile(c, r, itr12) {
+    const issues = [];
+    const lines = (c.inputs && Array.isArray(c.inputs.lines)) ? c.inputs.lines : [];
+    lines.forEach((l) => {
+      if (!l || typeof l !== 'object') return;
+      const f = fieldOf(l.field); if (!f) return;
+      if (l.docId) {
+        const d = (c.docs || []).find((x) => x.id === l.docId);
+        if (!d) issues.push(l.id + ' (' + f.label + ') cites document ' + l.docId + ', which is not on the case');
+        else if (d.status !== 'validated') issues.push(l.id + ' (' + f.label + ') comes from ' + d.name + ', which is ' + d.status);
+        else if (!d.kind) issues.push(l.id + ' (' + f.label + ') comes from ' + d.name + ', which could not be classified');
+        else if (f.kinds && !f.kinds.includes(d.kind)) issues.push(l.id + ': ' + f.label + ' cannot come from ' + d.name);
+      } else if (!f.sars) issues.push(l.id + ' (' + f.label + ') has no source document');
+    });
+    const cited = new Set(lines.filter((l) => l && typeof l === 'object').map((l) => l.docId).filter(Boolean));
+    (c.docs || []).filter((d) => d.status === 'validated' && FEEDS.includes(d.kind) && !cited.has(d.id))
+      .forEach((d) => issues.push(d.name + ' has no extracted values in the calculation'));
+    // The ITR12 must declare exactly the values and the medical membership the calculation used.
+    Object.keys(FIELDS).forEach((k) => {
+      const want = r2(r.used.filter((l) => l.field === k).reduce((a, l) => a + l.amount, 0));
+      const got = itr12.declared[k] ? itr12.declared[k].amount : 0;
+      if (Math.abs(want - got) > 0.005) issues.push('The ITR12 declares ' + rand(got) + ' for ' + FIELDS[k].label + '; the calculation used ' + rand(want));
+    });
+    const m = r.schedules.medical; const im = itr12.medical;
+    if (im.months !== m.months || im.share !== m.share || im.disability !== m.disability || JSON.stringify(im.periods) !== JSON.stringify(m.periods)) {
+      issues.push('The ITR12 medical scheme membership differs from the calculation');
+    }
+    return { ok: !issues.length, issues };
+  }
+
+  // The full calculation pack for a case: { calc, schedules, itr12, recon }, ready for ENGINE.change().
+  function forCase(c, version) {
+    const v = version || (typeof S !== 'undefined' && S && S.rulesetVersion) || RULESET.version;
+    const rs = rulesetOf(v);
+    const year = Number.isInteger(c.year) ? c.year : null;
+    const cl = (typeof S !== 'undefined' && S && S.clients ? S.clients : []).find((x) => x.id === c.clientId) || null;
+    const prof = profileOf(cl, year, c.inputs);
+    const r = compute(c.inputs, prof, rs, v);
+    const itr12 = itr12Of(c, cl, r, c.inputs);
+    const recon = r.schedules ? reconcile(c, r, itr12) : { ok: false, issues: r.errors.concat(r.pending.filter((p) => !p.field).map((p) => p.label)) };
+    // Year-on-year change in taxable income (TAX-05 when it is material and unexplained); only for a calculation that ran.
+    const prior = c.inputs && c.inputs.prior; const pol = (typeof S !== 'undefined' && S && S.policy && S.policy.materiality) || { amount: 1000, ratio: 0.2 };
+    let variance = null;
+    if (r.schedules && !r.errors.length && prior && typeof prior.taxableIncome === 'number' && isFinite(prior.taxableIncome)) {
+      const diff = r2(r.summary.taxableIncome - prior.taxableIncome);
+      const ratio = prior.taxableIncome ? Math.abs(diff) / Math.abs(prior.taxableIncome) : (diff ? 1 : 0);
+      variance = { prior: prior.taxableIncome, current: r.summary.taxableIncome, diff, ratio: Math.round(ratio * 10000) / 10000, material: Math.abs(diff) > pol.amount && ratio > pol.ratio };
+    }
+    const calc = { ruleset: r.ruleset, year: r.year, age: prof.age, summary: r.summary, lines: r.lines, pending: r.pending, errors: r.errors, wrongYear: r.wrongYear, variance };
+    return { calc, schedules: r.schedules, itr12, recon };
+  }
+
+  // Lineage rows for the calculation pack: document → extracted value → category → calculator field.
+  function lineage(c) {
+    const lines = (c.inputs && Array.isArray(c.inputs.lines)) ? c.inputs.lines : [];
+    return lines.filter((l) => l && typeof l === 'object').map((l) => {
+      const f = fieldOf(l.field) || {}; const d = l.docId ? (c.docs || []).find((x) => x.id === l.docId) : null;
+      return { line: l.id, doc: d ? d.id : null, file: d ? d.name : (f.sars ? 'SARS statement of account' : null), ref: l.ref || '', label: l.label || f.label || l.field,
+        amount: l.amount, category: f.cat || '?', field: l.field, judgement: f.judgement || null, decided: l.decided || null };
+    });
+  }
+
+  return { FIELDS, FEEDS, fieldOf, rulesetOf, r2, t2, rand, bracketTax, threshold, dobOf, yearEnd, ageOn, profileOf, compute, forCase, lineage };
+})();
+
 /* ===================== itr12/engine.js ===================== */
 /* ITR12 gate engine. Deterministic rules over REGISTER (Johan's exception register), WORKFLOW (his master document) and
    the lookups in workflow.js. Views, the seed and the PaperSync portal change case state only through ENGINE, and every
@@ -2162,7 +2551,8 @@ const DATES = (() => {
      release(c, gate, a, o) canRelease(c, gate, a, o) gateState(c, gate) drive(c, untilGate, o)
      raise(c, code, o) raiseManual(c, code, a, o) resolve(x, a, o) close(x, a, o) setSeverity(x, a, to, o) approveSeverity(x, a, o)
      requestOverride(x, a, o) approveOverride(x, a) setOverridable(code, on, a) recordFallback(x, a, o) reconcileFallback(x, a, o)
-     change(c, a, data, o) outsideEdit(c, patch) restoreVersion(c, a)
+     change(c, a, data, o) outsideEdit(c, patch) restoreVersion(c, a) calculate(c, a, o) decideItem(c, lineId, a, o) setInputs(c, a, inputs, o)
+     draftResponse(c, a, kind, drafts)
      requestTx(c, fn, a) g18Checks(t) g18Blockers(t) signG18(t, a) transmit(t, a, outcome) checkStatus(t, a, truth) retry(t, a) manualFallback(t, a, o)
      receive(item) routeInbound(item, caseId, a) confirmInboundDate(item, a, o) portal(c, action, d) recordWithdrawal(c, a, o) upload(c, itemId, file, a) approveNa(c, itemId, a)
      chooseRemedy(c, a, route, o) remind(c, kind, a) addHold / legalHold / releaseHold incidentStep(inc, step, a, o) closeIncident(inc, a)
@@ -2250,6 +2640,19 @@ const ENGINE = (() => {
     return null;
   }
 
+  // The Operon AI agent acting: not the independent reviewer, and only while the AI service is up and AI work is not paused.
+  function aiWhy(a) {
+    if (!a || a.type !== 'ai' || a.role !== 'AI Agent') return 'Only the Operon AI agent can do this';
+    if (S.paused) return 'AI work is paused';
+    if (!S.aiUp) return 'The AI service is unavailable';
+    return null;
+  }
+  // Rulesets by version (own keys only).
+  const rulesetOf = (v) => (typeof CALC !== 'undefined' ? CALC.rulesetOf(v) : null);
+  // The extracted values changed after the last calculation (a decision, a corrected value): the calculation must be rerun.
+  const calcStale = (c) => (c.inputs && c.calc && typeof c.calc.inputs === 'string' && c.calc.inputs !== digest(c.inputs)
+    ? 'The extracted values changed after version ' + vN(c) + ': rerun the calculation' : null);
+
   /* ===================== State ===================== */
   SEEDERS.push((s) => Object.assign(s, {
     clients: [], cases: [], exceptions: [], txs: [], inbound: [], incidents: [],
@@ -2308,6 +2711,7 @@ const ENGINE = (() => {
       gates: {}, req: { G02: [{ key: 'compare', label: 'SARS registered details compared with the client record', done: false }] },
       items: [], docs: [], questionnaire: { status: 'open', required: (o.required || ['employment', 'medical', 'ra', 'interest', 'rental', 'cgt', 'foreign']).slice(), answers: {}, at: null },
       priorYear: (o.priorYear || []).slice(), prepop: null, notices: [],
+      inputs: o.inputs ? structuredClone(o.inputs) : null,  // extracted values with their lineage (calc.js)
       calc: null, schedules: null, itr12: null, recon: { ok: true, issues: [] }, versions: [], approval: null, frozen: null,
       subTx: null, submission: null, da: null, vrf: null, aud: null, ita34: null, decision: null, outcome: null, remedy: null,
       retention: { from: null, until: null, review: null, holds: [], raised: {} },
@@ -2401,15 +2805,16 @@ const ENGINE = (() => {
     const ap = () => { const p = approvalProblem(c); if (p) miss.push(p); };
     const dr = () => { const d = drift(c); if (d.length) miss.push('The record differs from version ' + vN(c) + ' (' + list(d) + ')'); };
     const rs = () => { if (c.calc && c.calc.ruleset !== S.rulesetVersion) miss.push('The calculation used ruleset ' + c.calc.ruleset + '; the current ruleset is ' + S.rulesetVersion); };
+    const st = () => { const s = calcStale(c); if (s) miss.push(s); };
     switch (g) {
       case 'G01': clientOf(c).kyc.filter((k) => !k.ok).forEach((k) => miss.push(k.label + ' is not complete')); break;
       case 'G03': if (c.questionnaire.status !== 'submitted') miss.push('The client has not submitted the questionnaire'); break;
       case 'G04': c.items.forEach((it) => { const s = itemState(c, it); if (s !== 'validated' && s !== 'na') miss.push(it.label + (s === 'held' ? ' is held by an exception' : ' is outstanding')); }); break;
-      case 'G05': if (!c.calc) miss.push('No calculation yet'); if (!c.versions.length) miss.push('No version recorded'); rs(); break;
+      case 'G05': if (!c.calc) miss.push('No calculation yet'); if (!c.versions.length) miss.push('No version recorded'); rs(); st(); break;
       case 'G06': ap(); break;
-      case 'G07': ap(); dr(); break;
-      case 'G08': ap(); dr(); if (!c.recon.ok) miss.push('The final reconciliation fails'); rs(); break;
-      case 'G09': ap(); dr(); if (!c.frozen || c.frozen.version !== vN(c)) miss.push('Version ' + vN(c) + ' is not frozen'); break;
+      case 'G07': ap(); dr(); st(); break;
+      case 'G08': ap(); dr(); if (!c.recon.ok) miss.push('The final reconciliation fails'); rs(); st(); break;
+      case 'G09': ap(); dr(); st(); if (!c.frozen || c.frozen.version !== vN(c)) miss.push('Version ' + vN(c) + ' is not frozen'); break;
       case 'G12': if (!c.ita34) miss.push('No ITA34 received'); break;
       case 'G14': if (!c.decision) miss.push('The client has not decided'); break;
       case 'G15':
@@ -2630,7 +3035,7 @@ const ENGINE = (() => {
     const def = CODE[code]; if (!def) throw new Error('Unknown exception code ' + code);
     const a = o.by || ACTOR.system();
     if (c && o.dedupe !== false) {
-      const dup = exOf(c).find((x) => x.code === code && isOpen(x) && (x.item || null) === (o.item || null) && (x.txId || null) === (o.txId || null) && (x.docId || null) === (o.docId || null) && (x.holdId || null) === (o.holdId || null) && (x.inboundId || null) === (o.inboundId || null));
+      const dup = exOf(c).find((x) => x.code === code && isOpen(x) && (x.item || null) === (o.item || null) && (x.txId || null) === (o.txId || null) && (x.docId || null) === (o.docId || null) && (x.holdId || null) === (o.holdId || null) && (x.inboundId || null) === (o.inboundId || null) && (x.calcRef || null) === (o.calcRef || null));
       if (dup) return dup;
     }
     const gates = resolveGates(c, def, o);
@@ -2641,7 +3046,7 @@ const ENGINE = (() => {
       clientAction: o.clientAction || (def.owner === 'Client' ? def.resolution : null), clientDue: o.clientDue || null, sarsDeadline: o.sarsDeadline || null,
       related: [], parent: o.parent || null, resolution: null, evidence: null, resolvedBy: null, resolvedById: null, resolvedAt: null,
       humanApproval: def.sev === 'S1' || def.sev === 'S2', gateReleased: '', byGate: BY_GATE.includes(code), fromGate: o.fromGate || null,
-      item: o.item || null, docId: o.docId || null, txId: o.txId || null, holdId: o.holdId || null, inboundId: o.inboundId || null, status: 'raised', assignee: null,
+      item: o.item || null, docId: o.docId || null, txId: o.txId || null, holdId: o.holdId || null, inboundId: o.inboundId || null, calcRef: o.calcRef || null, status: 'raised', assignee: null,
       incidentId: null, closedBy: null, closedAt: null, fallback: def.blocking === 'Conditional' ? { recorded: null, reconciled: null } : null,
       override: null, sevRequest: null, note: o.note || '', at: now(),
     };
@@ -2700,6 +3105,14 @@ const ENGINE = (() => {
   }
   const txOf = (x) => (x.txId ? txById(x.txId) : null);
   const holdGuard = (c, x) => { const h = x.holdId && c.retention.holds.find((y) => y.id === x.holdId); return h && !h.released ? 'Release hold ' + h.id + ' (' + h.label + ') first' : null; };
+  // A judgement item the calculator flagged resolves once the Tax Consultant recorded the amount and rationale and the calculation was rerun.
+  function judgementGuard(c, x) {
+    if (!x.calcRef || !c.inputs) return null;
+    const l = (c.inputs.lines || []).find((y) => y.id === x.calcRef);
+    if (!l) return null;
+    if (!(l.decided && l.decided.by)) return 'Record the Tax Consultant’s amount and rationale for ' + l.id + ' first';
+    return c.calc && (c.calc.pending || []).some((p) => p.line === l.id) ? 'Rerun the calculation with the decision on ' + l.id + ' first' : null;
+  }
   const RESOLVE_GUARD = {
     'DOC-04': (c, x) => (x.related.map(exById).some((y) => y && y.code === 'SEC-01' && isOpen(y)) ? 'Resolve the linked SEC-01 incident first' : null),
     'INT-04': (c, x) => { const t = txOf(x); return t && t.status === 'unknown' ? 'Check the SARS status of ' + t.id + ' first: it is still unknown' : null; },
@@ -2716,6 +3129,21 @@ const ENGINE = (() => {
     'INT-01': () => (S.link.auth ? null : 'SARS authentication is still failing'),
     'INT-02': () => (S.link.rights ? null : 'The eFiling rights are still missing'),
     'RET-01': holdGuard, 'RET-02': holdGuard, 'RET-04': holdGuard,
+    'TAX-01': (c) => (c.calc && c.calc.errors && c.calc.errors.length ? 'The current calculation still fails validation: ' + c.calc.errors[0] : null),
+    'TAX-02': judgementGuard,
+    'AI-05': judgementGuard,
+    'TAX-06': (c) => {
+      const rs = rulesetOf(S.rulesetVersion);
+      if (!rs) return 'There is no ruleset ' + S.rulesetVersion;
+      if (rs.year !== c.year) return 'The configured ruleset ' + S.rulesetVersion + ' is for ' + rs.year + ', not ' + c.year;
+      return c.calc && c.calc.ruleset === S.rulesetVersion && !c.rerun ? null : 'Rerun the calculation on ruleset ' + S.rulesetVersion + ' first';
+    },
+    'AI-07': (c) => {
+      if (c.rerun) return 'Rerun the calculation on ruleset ' + S.rulesetVersion + ' first (impact assessment)';
+      const rs = rulesetOf(S.rulesetVersion);
+      if (rs && rs.year !== c.year) return 'The configured ruleset ' + S.rulesetVersion + ' is for ' + rs.year + ', not ' + c.year + ': restore the approved ruleset first';
+      return hasOpen(c, 'TAX-06') ? 'Resolve TAX-06 (wrong-year ruleset) first' : null;
+    },
   };
   function resolveGuard(c, x) {
     if (x.byGate && x.code !== 'CLT-07') return x.code + ' closes when ' + list(x.gates.filter((g) => g !== x.fromGate && g !== 'G17')) + ' pass' + (x.gates.some((g) => SUBSTANTIVE.includes(g) && g !== 'G09') ? ' and the SARS transaction succeeds' : '');
@@ -2916,7 +3344,8 @@ const ENGINE = (() => {
   /* ===================== Versions ===================== */
   function change(c, a, data, o) {
     o = o || {};
-    if (!(a.type === 'ai' || a.type === 'system')) { const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Change refused', w); }
+    if (a.type === 'ai') { const w = aiWhy(a); if (w) return refuse(a, c, 'Change refused', w); }
+    else if (a.type !== 'system') { const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Change refused', w); }
     if (c.submission && c.submission.ok) return refuse(a, c, 'Change refused', 'The return is submitted; a correction goes through G15 (Request for Correction)');
     const fl = itr12InFlight(c); if (fl) return refuse(a, c, 'Change refused', 'The ITR12 ' + fl.id + ' may already be with SARS (' + fl.status + '); establish its status first', { sarsTx: fl.id });
     const reason = String(o.reason || '').trim(); if (!reason) return refuse(a, c, 'Change refused', 'Give the reason for the change');
@@ -3026,6 +3455,7 @@ const ENGINE = (() => {
     const out = liveEx(c).filter((x) => blocksNow(x) && !x.byGate && x.sev === 'S3' && x.gates.includes('G18') && (!x.txId || x.txId === t.id)
       && !ign.includes(x.code) && !(x.code === 'INT-03' && S.link.up)).map((x) => x.code + ' (' + x.sev + ')');
     S.incidents.filter((i) => i.caseId === c.id && i.status === 'open').forEach((i) => out.push('open incident ' + i.id + ' (G17)'));
+    if (t.fn === 'itr12' && calcStale(c)) out.push(calcStale(c));
     return out;
   }
   const checkText = (bad, gb) => [bad.length ? 'Check ' + bad.map((k) => k.n + ' fails (' + k.why + ')').join('; ') : '', gb.length ? 'Blocked by ' + list(gb) : ''].filter(Boolean).join('; ');
@@ -3735,12 +4165,14 @@ const ENGINE = (() => {
   function rulesetChange(a, o) {
     o = o || {};
     if (!(a.type === 'platform' || a.type === 'system')) return refuse(a, null, 'Ruleset change refused', 'The platform team changes the ruleset');
+    if (o.version && typeof CALC !== 'undefined' && !rulesetOf(o.version)) return refuse(a, null, 'Ruleset change refused', 'There is no ruleset ' + o.version);
     const before = S.rulesetVersion; S.rulesetVersion = String(o.version || before);
-    log(a, 'Changed the tax ruleset from ' + before + ' to ' + S.rulesetVersion + (o.wrongYear ? ' (wrong tax year configured)' : ''), { before, after: S.rulesetVersion, result: 'Changed' });
+    const rs = rulesetOf(S.rulesetVersion);
+    log(a, 'Changed the tax ruleset from ' + before + ' to ' + S.rulesetVersion + (rs ? ' (the ' + rs.year + ' year of assessment)' : ''), { before, after: S.rulesetVersion, result: 'Changed' });
     S.cases.filter((c) => !(c.submission && c.submission.ok) && c.calc).forEach((c) => {
       c.rerun = true;
       raise(c, 'AI-07', { by: ACTOR.system(), note: 'Ruleset ' + before + ' → ' + S.rulesetVersion + ' after material processing', noSettle: true });
-      if (o.wrongYear) raise(c, 'TAX-06', { by: ACTOR.system(), note: 'Ruleset ' + S.rulesetVersion + ' is configured for the wrong tax year', noSettle: true });
+      if (rs && rs.year !== c.year) raise(c, 'TAX-06', { by: ACTOR.system(), noSettle: true, note: 'Ruleset ' + S.rulesetVersion + ' is for the ' + rs.year + ' year of assessment, not ' + c.year });
       settle(c);
     });
     return okr();
@@ -3793,6 +4225,79 @@ const ENGINE = (() => {
     return { ok: true, n: S.audit.length, badAt: -1 };
   }
 
+  /* ===================== The calculation (calc.js) ===================== */
+  // Runs the calculator on the case's extracted values, records the result as a new version, then raises what it found:
+  // TAX-01 validation errors, TAX-06 a ruleset for another year, TAX-02/AI-05 undecided judgement items, TAX-05 a material
+  // unexplained year-on-year change (once per figure).
+  function calculate(c, a, o) {
+    o = o || {};
+    if (typeof CALC === 'undefined') return fail('The calculator is not loaded');
+    if (!c.inputs) return fail('No extracted values on ' + c.id);
+    const data = CALC.forCase(c); const k = data.calc;
+    k.inputs = digest(c.inputs);  // the extracted values this calculation used (calcStale compares it)
+    const r = change(c, a, data, { reason: o.reason || 'Calculation on ruleset ' + k.ruleset, material: o.material });
+    if (!r.ok) return r;
+    const ai = ACTOR.ai(); const sys = ACTOR.system();
+    if (k.errors.length) raise(c, 'TAX-01', { by: sys, note: k.errors.join('; '), noSettle: true });
+    if (k.wrongYear) raise(c, 'TAX-06', { by: sys, note: 'Ruleset ' + k.ruleset + ' is for the ' + k.year + ' year of assessment, not ' + c.year, noSettle: true });
+    k.pending.forEach((p) => raise(c, p.code, { by: ai, calcRef: p.line, noSettle: true,
+      note: p.label + ' (' + p.line + ', ' + CALC.rand(p.amount) + '): ' + (p.code === 'AI-05' ? 'needs interpretation beyond the approved rules' : 'a judgement for the Tax Consultant; left out of the calculation') }));
+    const vr = k.variance;
+    const cur = vr && vr.material ? 'TI ' + vr.current : null;
+    // A TAX-05 raised on an earlier figure no longer describes the case: the system withdraws it.
+    openOf(c, 'TAX-05').filter((x) => x.calcRef && /^TI /.test(x.calcRef) && x.calcRef !== cur).forEach((x) => finishResolve(x, sys,
+      'Superseded: taxable income is now ' + CALC.rand(k.summary.taxableIncome) + (cur ? '' : ', no longer a material change on last year'), null));
+    if (cur && !exOf(c).some((x) => x.code === 'TAX-05' && x.calcRef === cur)) {
+      raise(c, 'TAX-05', { by: ai, calcRef: cur, noSettle: true, note: 'Taxable income ' + CALC.rand(vr.current) + ' against ' + CALC.rand(vr.prior) + ' last year (' + (Math.round(vr.ratio * 1000) / 10) + '% change)' });
+    }
+    settle(c);
+    return r;
+  }
+  // The values extracted from the case's documents (simulated) or entered by the Tax Consultant. calculate() reads them.
+  function setInputs(c, a, inputs, o) {
+    o = o || {};
+    if (a.type === 'ai') { const w = aiWhy(a); if (w) return refuse(a, c, 'Extracted values refused', w); }
+    else if (a.type !== 'system') { const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Extracted values refused', w); }
+    if (c.submission && c.submission.ok) return refuse(a, c, 'Extracted values refused', 'The return is submitted; a correction goes through G15 (Request for Correction)');
+    const fl = itr12InFlight(c); if (fl) return refuse(a, c, 'Extracted values refused', 'The ITR12 ' + fl.id + ' may already be with SARS (' + fl.status + '); establish its status first', { sarsTx: fl.id });
+    if (!inputs || !Array.isArray(inputs.lines)) return fail('Give the extracted values as { lines: [...] }');
+    const before = c.inputs ? c.inputs.lines.length : 0;
+    c.inputs = structuredClone(inputs);
+    const docs = new Set(c.inputs.lines.map((l) => l.docId).filter(Boolean));
+    log(a, (o.note || 'Recorded the extracted values') + ': ' + c.inputs.lines.length + ' value' + (c.inputs.lines.length === 1 ? '' : 's') + ' from ' + docs.size + ' document' + (docs.size === 1 ? '' : 's'),
+      Object.assign(cf(c), { before, after: c.inputs.lines.length, result: 'Recorded' }));
+    return okr();
+  }
+  // Drafted answers to a Declaration Questionnaire ('da') or a verification request ('vrf'), each tied to its evidence.
+  function draftResponse(c, a, kind, drafts) {
+    const w = a.type === 'ai' ? aiWhy(a) : staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Draft refused', w);
+    const t = kind === 'da' ? c.da : kind === 'vrf' ? c.vrf : null;
+    if (!t) return fail('No ' + (kind === 'da' ? 'Declaration Questionnaire' : 'verification request') + ' on ' + c.id);
+    if (kind === 'da' && (t.submitted || t.moved)) return fail('The Declaration Questionnaire is already answered or has moved to verification');
+    t.drafts = (drafts || []).map((d) => ({ q: String(d.q || ''), a: String(d.a || ''), evidence: d.evidence || null }));
+    t.draftedBy = whoOf(a); t.draftedAt = now();
+    log(a, 'Drafted ' + t.drafts.length + ' answer' + (t.drafts.length === 1 ? '' : 's') + ' to ' + t.ref + (a.type === 'ai' ? ' for the Tax Consultant to review (simulated)' : ''),
+      Object.assign(cf(c), { sarsRef: t.ref, result: 'Drafted' }));
+    return kind === 'da' ? markReq(c, 'G10', 'draft', a) : okr();
+  }
+  // The Tax Consultant's decision on a judgement item: the amount and the treatment, authority or rationale. calculate() then uses it.
+  function decideItem(c, lineId, a, o) {
+    o = o || {};
+    const w = staffWhy(a, 'Tax Consultant'); if (w) return refuse(a, c, 'Decision refused', w);
+    if (c.submission && c.submission.ok) return refuse(a, c, 'Decision refused', 'The return is submitted; a correction goes through G15 (Request for Correction)');
+    const fl = itr12InFlight(c); if (fl) return refuse(a, c, 'Decision refused', 'The ITR12 ' + fl.id + ' may already be with SARS (' + fl.status + '); establish its status first', { sarsTx: fl.id });
+    const l = c.inputs && (c.inputs.lines || []).find((x) => x.id === lineId); if (!l) return fail('No extracted value ' + lineId);
+    const f = typeof CALC !== 'undefined' ? CALC.FIELDS[l.field] : null;
+    if (!f || !f.judgement) return fail(lineId + ' is not a judgement item');
+    const rationale = String(o.rationale || '').trim();
+    if (!rationale) return refuse(a, c, 'Decision refused', 'Record the treatment, the authority or rationale, and the conclusion');
+    const amount = o.amount == null ? l.amount : Number(o.amount);
+    if (!isFinite(amount) || (amount < 0 && !f.signed)) return refuse(a, c, 'Decision refused', 'Give a valid amount');
+    const before = l.amount; l.amount = amount; l.decided = { by: a.id, at: now(), rationale };
+    log(a, 'Decided ' + f.label + ' (' + l.id + '): ' + CALC.rand(amount) + '. ' + rationale, Object.assign(cf(c), { before, after: amount, reason: rationale, result: 'Decided' }));
+    return okr();
+  }
+
   /* ===================== drive(): the happy path, used by the tests and the seed ===================== */
   // Moves a case forward with the right actor at each gate until `until` is the current gate. Options: answers, data, route, decision.
   function stubData(c) {
@@ -3822,7 +4327,11 @@ const ENGINE = (() => {
           c.items.forEach((it) => { if (itemState(c, it) === 'requested') upload(c, it.id, { name: FILE_FOR[it.kind] || (it.kind + '_2026.pdf'), size: 245760 }, ACTOR.client(c.clientId)); });
           r = c.gates.G04.status === 'released' ? okr() : release(c, 'G04', tc); break;
         case 'G05':
-          if (!c.calc || !c.versions.length || c.calc.ruleset !== S.rulesetVersion) { const ch = change(c, tc, o.data || stubData(c), { reason: o.data ? 'Calculation' : 'Calculation (test stub)' }); if (!ch.ok) { r = ch; break; } }
+          if (!c.calc || !c.versions.length || c.calc.ruleset !== S.rulesetVersion || c.rerun || calcStale(c)) {
+            const ch = o.data ? change(c, tc, o.data, { reason: 'Calculation' })
+              : c.inputs && typeof CALC !== 'undefined' ? calculate(c, tc) : change(c, tc, stubData(c), { reason: 'Calculation (test stub)' });
+            if (!ch.ok) { r = ch; break; }
+          }
           r = release(c, 'G05', tc); break;
         case 'G06': r = portal(c, 'approve', { version: vN(c), declaration: true }); break;
         case 'G07': r = fail('G07 did not release: ' + canRelease(c, 'G07', ACTOR.system()).why); break;
@@ -3863,7 +4372,7 @@ const ENGINE = (() => {
     raise, raiseManual, resolve, close, resolverCheck, resolveGuard, setSeverity, approveSeverity, eligibleWhy, overrideWhy, requestOverride, approveOverride,
     setOverridable, recordFallback, reconcileFallback,
     // versions
-    change, outsideEdit, restoreVersion,
+    change, outsideEdit, restoreVersion, calculate, decideItem, setInputs, draftResponse,
     // SARS link and inbound
     requestTx, g18Checks, g18Blockers, signG18, transmit, checkStatus, retry, manualFallback, receive, routeInbound, confirmInboundDate, remedyDeadline,
     // documents, portal and withdrawals
@@ -3876,6 +4385,291 @@ const ENGINE = (() => {
     auditCsv, auditJson, verifyChain, drive, stubData,
   };
 })();
+
+/* ===================== itr12/seed.js ===================== */
+/* The demo firm's synthetic cases: one or two per workflow stage, each showing the exception codes the plan names.
+   Every person is made up: the names, the tax references, and the ID numbers (built from the date of birth with a check digit
+   that deliberately fails the SA ID checksum). Every figure comes from CALC through ENGINE.calculate(), so the seeded numbers
+   always reproduce through calc.js; SARS's ITA34 figures are calc.js run on the inputs SARS used.
+   The history is replayed in date order across all cases with the demo clock moved back to each step's date, so the audit
+   trail reads chronologically. Everything goes through ENGINE; anything ENGINE refuses is collected in DEMO.problems (the
+   tests require it to be empty). Tests of the engine itself set DEMO.cases = false for an empty firm. */
+const DEMO = { cases: true, problems: [], keys: {} };
+
+const DEMO_SEED = (() => {
+  // An SA-ID-shaped number for a date of birth whose check digit is deliberately wrong (Luhn), so it can never be a real ID.
+  function demoId(dob, n) {
+    const body = dob.slice(2, 4) + dob.slice(5, 7) + dob.slice(8, 10) + String(n).padStart(4, '0') + '08';
+    let sum = 0;
+    for (let i = 0; i < body.length; i++) { let d = +body[body.length - 1 - i]; if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; } sum += d; }
+    const right = (10 - (sum % 10)) % 10;
+    return body + ((right + 5) % 10);
+  }
+  // [date of birth, provisional taxpayer, consultant]
+  const CLIENTS = {
+    onboarding: { name: 'Nomvula Dlamini', dob: '1988-04-12' },
+    details: { name: 'Sipho Mokoena', dob: '1979-09-03' },
+    questionnaire: { name: 'Elena Rossouw', dob: '1984-01-27', tc: 'TC2' },
+    documents: { name: 'Thandiwe Nkosi', dob: '1991-06-18' },
+    wrongTaxpayer: { name: 'Kagiso Molefe', dob: '1982-11-05', others: ['Lindiwe Molefe'], tc: 'TC2' },
+    judgement: { name: 'Ruan Botha', dob: '1986-03-30' },
+    calcReady: { name: 'Tebogo Sithole', dob: '1975-08-14', tc: 'TC2' },
+    approval: { name: 'Fatima Adams', dob: '1990-02-09' },
+    rework: { name: 'Michael Naidoo', dob: '1981-12-01', tc: 'TC2' },
+    ready: { name: 'Zanele Mthembu', dob: '1987-07-22' },
+    unknown: { name: 'Hendrik Joubert', dob: '1958-05-16', tc: 'TC2' },
+    declaration: { name: 'Priya Govender', dob: '1983-10-10', provisional: false },
+    verification: { name: 'Andile Zulu', dob: '1980-03-03', tc: 'TC2' },
+    assessment: { name: 'Grace van der Merwe', dob: '1972-06-25' },
+    remedy: { name: 'Lwazi Ndlovu', dob: '1985-09-19', tc: 'TC2' },
+    closed: { name: 'Ingrid Fourie', dob: '1950-01-08', provisional: false },
+  };
+  const ln = (doc, ref, field, amount, extra) => Object.assign({ doc, ref, field, amount }, extra || {});
+  const IRP5 = (rem, paye, more) => [ln('irp5', 'IRP5 code 3601: income', 'remuneration', rem), ln('irp5', 'IRP5 code 4102: PAYE', 'paye', paye)].concat(more || []);
+  const MED = (fees, exp) => [ln('medical', 'Medical scheme certificate: contributions', 'medicalFees', fees)].concat(exp ? [ln('medical', 'Medical scheme certificate: expenses not paid by the scheme', 'medicalExpenses', exp)] : []);
+
+  return function run() {
+    const P = DEMO.problems; const K = {};
+    const tc = (id) => ACTOR.as('Tax Consultant', id || 'TC1');
+    const ad = ACTOR.as('Administrator', 'AD1'); const ia = ACTOR.as('Integration Administrator', 'IA1'); const ai = ACTOR.ai(); const sys = ACTOR.system();
+    const ok = (r, what) => { if (!r || r.ok === false) P.push(what + ': ' + (r ? r.why : 'no result')); return r; };
+    // Run fn with the demo clock at a local date and time. Each read of the clock moves on a millisecond and the clock never goes
+    // back (two steps at the same minute follow each other), so the audit trail stays in date order.
+    let lastT = 0;
+    function at(when, fn) {
+      const [d, t] = when.split(' '); const [y, m, dd] = d.split('-').map(Number); const [h, mi] = (t || '09:00').split(':').map(Number);
+      let next = Math.max(new Date(y, m - 1, dd, h, mi).getTime(), lastT + 1); const real = Date.now;
+      Date.now = () => { lastT = next++; return CLOCK_REAL0 + (lastT - CLOCK_START); };
+      try { return fn(); } finally { Date.now = real; }
+    }
+    const steps = [];
+    const story = (key, list) => list.forEach(([when, fn]) => steps.push({ when, key, fn }));
+    let idN = 0;
+    function open(key, co) {
+      const p = CLIENTS[key]; idN += 1;
+      const cl = ENGINE.newClient({ name: p.name, idNo: demoId(p.dob, 5000 + idN * 37), taxRef: String(9061000000 + idN * 7331), provisional: p.provisional !== false,
+        others: p.others || [], kyc: co && co.kyc });
+      const c = ENGINE.newCase(cl, { consultant: p.tc || 'TC1', items: co.items, priorYear: co.priorYear || ['employment', 'medical'] });
+      K[key] = { cl, c, tc: tc(p.tc) };
+      DEMO.keys[key] = c.id;
+      return K[key];
+    }
+    const drive = (key, gate, o) => { const r = ENGINE.drive(K[key].c, gate, o || {}); ok(r.ok && ENGINE.currentGate(K[key].c) === gate ? r : { ok: false, why: (r.why || 'stopped') + ' at ' + ENGINE.currentGate(K[key].c) }, key + ' drive to ' + gate); };
+    // The simulated extraction: each value is tied to the newest validated document of its kind.
+    function extract(key, lines, medical, extra, note) {
+      const { c } = K[key];
+      const inputs = Object.assign({ lines: lines.map((l, i) => {
+        const d = l.doc ? c.docs.filter((x) => x.kind === l.doc && x.status === 'validated').pop() : null;
+        if (l.doc && !d) P.push(key + ': no validated ' + l.doc + ' document for ' + l.ref);
+        return Object.assign({ id: 'L' + (i + 1), docId: d ? d.id : null, ref: l.ref, field: l.field, amount: l.amount }, l.decided ? { decided: l.decided } : {});
+      }) }, medical ? { medical } : {}, extra || {});
+      ok(ENGINE.setInputs(c, ai, inputs, { note: note || 'Extracted the values from the validated documents (simulated)' }), key + ' extract');
+    }
+    const calc = (key, a) => ok(ENGINE.calculate(K[key].c, a || ai), key + ' calculate');
+    const rel = (key, g, a) => ok(ENGINE.release(K[key].c, g, a || K[key].tc), key + ' release ' + g);
+    const up = (key, kind, name, size) => { const { c } = K[key]; const it = c.items.find((x) => x.kind === kind); return ok(ENGINE.upload(c, it.id, { name, size: size || 245760 }, ACTOR.client(c.clientId)), key + ' upload ' + name); };
+    const itx = (key, fn) => S.txs.filter((t) => t.caseId === K[key].c.id && t.fn === (fn || 'itr12')).pop();
+    const file = (key, outcome) => { const t = itx(key); ok(ENGINE.signG18(t, ia), key + ' G18 integration sign-off'); ok(ENGINE.signG18(t, K[key].tc), key + ' G18 consultant sign-off'); ok(ENGINE.transmit(t, ia, outcome || 'success'), key + ' transmit'); };
+    const sarsSays = (key, patch) => { const { c, cl } = K[key]; const inp = structuredClone(c.inputs); patch(inp); return CALC.compute(inp, CALC.profileOf(cl, c.year, inp), RULESET).summary; };
+    const ita34 = (key, ref, date, data) => { const { c, cl } = K[key]; ENGINE.receive({ fn: 'ita34', taxRef: cl.taxRef, year: c.year, ref, date, data, submissionRef: c.submission ? c.submission.ref : null }); };
+
+    /* ---------- 1. Onboarding: G01 blocked by KYC-01 (proof of address) and KYC-05 (unsigned mandate) ---------- */
+    story('onboarding', [
+      ['2026-11-03 10:15', () => {
+        open('onboarding', { items: ['irp5', 'medical'], kyc: { address: false, mandate: false } });
+        const { c } = K.onboarding;
+        ENGINE.raise(c, 'KYC-01', { by: sys, note: 'Proof of address not received' });
+        ENGINE.raise(c, 'KYC-05', { by: sys, note: 'The appointment letter and mandate are not signed' });
+      }],
+    ]);
+    /* ---------- 2. SARS details: MD-05 bank mismatch and MD-01 address difference at G02 ---------- */
+    story('details', [
+      ['2026-10-29 11:00', () => { open('details', { items: ['irp5', 'medical'] }); drive('details', 'G02'); }],
+      ['2026-11-04 09:40', () => {
+        const { c } = K.details;
+        ok(ENGINE.markReq(c, 'G02', 'compare', ai), 'details compare');
+        ENGINE.raise(c, 'MD-05', { by: ai, note: 'The bank confirmation letter shows a different account from the one SARS holds (simulated comparison)' });
+        ENGINE.raise(c, 'MD-01', { by: ai, note: 'SARS holds a residential address in Pretoria; the client record says Centurion (simulated comparison)' });
+      }],
+    ]);
+    /* ---------- 3. Questionnaire: QUE-04 retirement annuity gone, QUE-03 new rental ---------- */
+    story('questionnaire', [
+      ['2026-10-27 14:20', () => { open('questionnaire', { items: ['irp5', 'medical'], priorYear: ['employment', 'medical', 'ra'] }); drive('questionnaire', 'G03'); }],
+      ['2026-11-05 19:05', () => {
+        const { c } = K.questionnaire;
+        [['employment', true], ['medical', true], ['ra', false], ['interest', false], ['rental', true], ['cgt', false], ['foreign', false]]
+          .forEach(([key, value]) => ENGINE.portal(c, 'answer', { key, value }));
+        ENGINE.portal(c, 'submitQuestionnaire');
+      }],
+    ]);
+    /* ---------- 4. Documents: AI-01 low confidence, DOC-02 IRP5 against the pre-populated data, DOC-01 missing certificate ---------- */
+    story('documents', [
+      ['2026-10-20 08:30', () => {
+        open('documents', { items: ['irp5', 'medical'] });
+        const { c, cl } = K.documents;
+        ENGINE.receive({ fn: 'prepop', taxRef: cl.taxRef, year: c.year, ref: 'PREPOP-2026', date: '2026-10-20', data: { remuneration: 398400, paye: 61200 } });
+        drive('documents', 'G04');
+      }],
+      ['2026-11-04 20:12', () => {
+        const { c } = K.documents;
+        up('documents', 'irp5', 'IRP5_2026_scan_whatsapp.jpg', 182000);
+        const d = c.docs[c.docs.length - 1];
+        ENGINE.raise(c, 'DOC-02', { by: ai, docId: d.id, note: 'IRP5 remuneration R412,900.00 differs from the SARS pre-populated R398,400.00' });
+        ENGINE.portal(c, 'submitDocs');
+      }],
+    ]);
+    /* ---------- 5. Documents: DOC-04 the spouse's IRP5 (S1) with the linked SEC-01 incident ---------- */
+    story('wrongTaxpayer', [
+      ['2026-10-26 09:10', () => { open('wrongTaxpayer', { items: ['irp5', 'medical'] }); drive('wrongTaxpayer', 'G04'); }],
+      ['2026-11-06 16:45', () => { up('wrongTaxpayer', 'irp5', 'IRP5_2026_Lindiwe_Molefe.pdf'); }],
+    ]);
+    /* ---------- 6. Calculation: TAX-02 home office (a judgement) and TAX-05 a material change on last year ---------- */
+    story('judgement', [
+      ['2026-10-14 10:00', () => { open('judgement', { items: ['irp5', 'medical', 'homeoffice'] }); drive('judgement', 'G05'); }],
+      ['2026-11-05 11:30', () => {
+        extract('judgement', IRP5(612400, 158900).concat(MED(52800, 6400), [ln('homeoffice', 'Home office schedule: costs claimed', 'homeOffice', 24000)]),
+          { months: 12, dependants: 1 }, { prior: { taxableIncome: 402000 } });
+        calc('judgement');
+      }],
+    ]);
+    /* ---------- 7. Calculation: clean, G05 ready for the consultant (pension fund, retirement annuity, donations) ---------- */
+    story('calcReady', [
+      ['2026-10-12 09:00', () => { open('calcReady', { items: ['irp5', 'medical', 'ra', 'donation'], priorYear: ['employment', 'medical', 'ra'] }); drive('calcReady', 'G05'); }],
+      ['2026-11-06 15:20', () => {
+        extract('calcReady', IRP5(948000, 268400, [ln('irp5', 'IRP5 code 4001: pension fund contributions', 'retirementFund', 71100)])
+          .concat(MED(64800, 9500), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 120000), ln('donation', 'Section 18A receipt', 'donations', 30000)]),
+        { months: 12, dependants: 2 }, { prior: { taxableIncome: 731000 } });
+        calc('calcReady');
+      }],
+    ]);
+    /* ---------- 8. Client approval: pack sent, G06 pending, the CLT-05 reminder running ---------- */
+    story('approval', [
+      ['2026-10-08 13:00', () => { open('approval', { items: ['irp5', 'medical'] }); drive('approval', 'G05'); }],
+      ['2026-11-03 10:00', () => { extract('approval', IRP5(356000, 52700).concat(MED(31200, 0)), { months: 12, dependants: 0 }); calc('approval'); rel('approval', 'G05'); }],
+      ['2026-11-04 09:00', () => { ok(ENGINE.remind(K.approval.c, 'approval', ad), 'approval reminder'); }],
+    ]);
+    /* ---------- 9. Rework: approved, then CLT-03 new information, version 2 and VER-01 ---------- */
+    story('rework', [
+      ['2026-10-05 09:30', () => { open('rework', { items: ['irp5', 'medical', 'ra'], priorYear: ['employment', 'medical', 'ra'] }); drive('rework', 'G05'); }],
+      ['2026-10-28 10:10', () => {
+        extract('rework', IRP5(524000, 107300).concat(MED(46800, 3100), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 36000)]), { months: 12, dependants: 1 });
+        calc('rework'); rel('rework', 'G05');
+      }],
+      ['2026-10-30 18:40', () => { ok(ENGINE.portal(K.rework.c, 'approve', { version: ENGINE.vN(K.rework.c), declaration: true }), 'rework approve'); }],
+      ['2026-11-03 08:50', () => {
+        const { c } = K.rework;
+        ok(ENGINE.raiseManual(c, 'CLT-03', K.rework.tc, { note: 'After approving, the client sent a section 18A receipt for a R15,000.00 donation' }), 'rework CLT-03');
+        ENGINE.addItem(c, 'donation');
+        up('rework', 'donation', 'Section18A_receipt_2026.pdf');
+      }],
+      ['2026-11-04 11:25', () => {
+        const { c } = K.rework;
+        extract('rework', IRP5(524000, 107300).concat(MED(46800, 3100), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 36000), ln('donation', 'Section 18A receipt', 'donations', 15000)]),
+          { months: 12, dependants: 1 }, null, 'Added the section 18A receipt the client sent after approving (simulated extraction)');
+        calc('rework', K.rework.tc);
+        const x = ENGINE.exOf(c).find((y) => y.code === 'CLT-03' && ENGINE.isOpen(y));
+        if (x) ok(ENGINE.resolve(x, K.rework.tc, { action: 'The receipt is in the calculation as version 2' }), 'rework resolve CLT-03');
+        rel('rework', 'G05');
+      }],
+    ]);
+    /* ---------- 10. Ready to submit: through G07, G08 and G09; G18 has the first of its two sign-offs ---------- */
+    story('ready', [
+      ['2026-09-29 10:00', () => { open('ready', { items: ['irp5', 'medical', 'it3b'], priorYear: ['employment', 'medical', 'interest'] }); drive('ready', 'G05'); }],
+      ['2026-10-30 14:00', () => { extract('ready', IRP5(468000, 89500).concat(MED(39600, 0), [ln('it3b', 'IT3(b): local interest', 'interest', 18750)]), { months: 12, dependants: 0 }); calc('ready'); rel('ready', 'G05'); }],
+      ['2026-11-02 21:15', () => { drive('ready', 'G18'); }],
+      ['2026-11-09 08:35', () => { ok(ENGINE.signG18(itx('ready'), ia), 'ready G18 integration sign-off'); }],
+    ]);
+    /* ---------- 11. Submission: INT-04 unknown status, no retry until SARS's status is checked (65+, medical credits) ---------- */
+    story('unknown', [
+      ['2026-09-15 09:00', () => { open('unknown', { items: ['irp5', 'medical', 'it3b'], priorYear: ['employment', 'medical', 'interest'] }); drive('unknown', 'G05'); }],
+      ['2026-10-21 10:30', () => { extract('unknown', IRP5(384000, 41200).concat(MED(74400, 28600), [ln('it3b', 'IT3(b): local interest', 'interest', 61500)]), { months: 12, dependants: 1 }); calc('unknown'); rel('unknown', 'G05'); }],
+      ['2026-10-26 12:00', () => { drive('unknown', 'G18'); }],
+      ['2026-11-06 14:10', () => { file('unknown', 'unknown'); }],
+    ]);
+    /* ---------- 12. After filing: DA-01 with drafted answers; DA-05 as the due date nears ---------- */
+    story('declaration', [
+      ['2026-08-03 09:00', () => { open('declaration', { items: ['irp5', 'medical', 'ra'], priorYear: ['employment', 'medical', 'ra'] }); drive('declaration', 'G05'); }],
+      ['2026-08-24 10:00', () => { extract('declaration', IRP5(587000, 133900).concat(MED(50400, 7200), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 54000)]), { months: 12, dependants: 1 }); calc('declaration'); rel('declaration', 'G05'); }],
+      ['2026-08-25 19:30', () => { drive('declaration', 'G18'); }],
+      ['2026-10-13 10:00', () => { file('declaration'); }],
+      ['2026-11-03 07:30', () => {
+        const { c, cl } = K.declaration;
+        ENGINE.receive({ fn: 'daIn', taxRef: cl.taxRef, year: c.year, ref: 'DA-2026-118204', date: '2026-11-03', due: '2026-11-17', data: { questions: [
+          'Confirm the retirement annuity contributions you deducted',
+          'Confirm the qualifying medical expenses you claimed',
+        ] } });
+      }],
+      ['2026-11-05 15:40', () => {
+        ok(ENGINE.draftResponse(K.declaration.c, ai, 'da', [
+          { q: 'Confirm the retirement annuity contributions you deducted', a: 'R54,000.00, as on the fund’s certificate', evidence: 'RA_certificate_2026.pdf' },
+          { q: 'Confirm the qualifying medical expenses you claimed', a: 'R7,200.00 not paid by the scheme, as on the scheme’s tax certificate', evidence: 'Medical_scheme_certificate_2026.pdf' },
+        ]), 'declaration drafts');
+      }],
+    ]);
+    /* ---------- 13. After filing: VRF-01 verification, VRF-05 incomplete pack, the 21-business-day tracker ---------- */
+    story('verification', [
+      ['2026-08-10 09:00', () => { open('verification', { items: ['irp5', 'medical', 'ra'], priorYear: ['employment', 'medical', 'ra'] }); drive('verification', 'G05'); }],
+      ['2026-09-07 11:00', () => { extract('verification', IRP5(702000, 171800).concat(MED(55200, 12800), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 96000)]), { months: 12, dependants: 2 }); calc('verification'); rel('verification', 'G05'); }],
+      ['2026-09-09 08:15', () => { drive('verification', 'G18'); }],
+      ['2026-09-25 09:45', () => { file('verification'); }],
+      ['2026-10-13 07:30', () => {
+        const { c, cl } = K.verification;
+        const due = DATES.iso(DATES.addBusinessDays(DATES.dt('2026-10-13'), 21));
+        ENGINE.receive({ fn: 'vrfIn', taxRef: cl.taxRef, year: c.year, ref: 'VRF-2026-554310', date: '2026-10-13', due, data: { requests: [
+          'Retirement annuity certificates for every fund', 'Medical scheme tax certificate', 'Proof of out-of-pocket medical expenses'] } });
+      }],
+      ['2026-11-06 10:20', () => {
+        ENGINE.raise(K.verification.c, 'VRF-05', { by: ai, note: 'Proof of the R12,800.00 out-of-pocket medical expenses is missing from the response pack' });
+      }],
+    ]);
+    /* ---------- 14. Assessment: ASM-02 the ITA34 differs (SARS used R42,000.00 for the retirement annuity); G13 pending ---------- */
+    story('assessment', [
+      ['2026-08-18 09:00', () => { open('assessment', { items: ['irp5', 'medical', 'ra', 'it3c'], priorYear: ['employment', 'medical', 'ra', 'cgt'] }); drive('assessment', 'G05'); }],
+      ['2026-09-21 10:00', () => {
+        extract('assessment', IRP5(735000, 196500).concat(MED(57600, 0), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 60000),
+          ln('it3c', 'IT3(c): listed shares', 'capitalGain', 185000), ln('it3c', 'IT3(c): unit trusts', 'capitalGain', -22000)]), { months: 12, dependants: 1 });
+        calc('assessment'); rel('assessment', 'G05');
+      }],
+      ['2026-09-22 20:00', () => { drive('assessment', 'G18'); }],
+      ['2026-10-02 09:30', () => { file('assessment'); }],
+      ['2026-10-28 06:00', () => { ita34('assessment', 'ITA34-2026-7781230', '2026-10-28', sarsSays('assessment', (inp) => { inp.lines.find((l) => l.field === 'ra').amount = 42000; })); }],
+    ]);
+    /* ---------- 15. Remedies: CLT-07 and REM-01, then REM-05 objection with its Chapter 9 deadline ---------- */
+    story('remedy', [
+      ['2026-07-20 09:00', () => { open('remedy', { items: ['irp5', 'medical', 'donation'] }); drive('remedy', 'G05'); }],
+      ['2026-08-04 10:00', () => {
+        extract('remedy', IRP5(498000, 98600).concat(MED(42000, 5600), [ln('donation', 'Section 18A receipt', 'donations', 25000)]), { months: 12, dependants: 1 });
+        calc('remedy'); rel('remedy', 'G05');
+      }],
+      ['2026-08-06 18:00', () => { drive('remedy', 'G18'); }],
+      ['2026-08-18 09:15', () => { file('remedy'); }],
+      ['2026-09-03 06:00', () => { ita34('remedy', 'ITA34-2026-6620917', '2026-09-03', sarsSays('remedy', (inp) => { inp.lines = inp.lines.filter((l) => l.field !== 'donations'); })); }],
+      ['2026-09-10 11:00', () => {
+        const { c } = K.remedy;
+        const x = ENGINE.exOf(c).find((y) => y.code === 'ASM-02' && ENGINE.isOpen(y));
+        if (x) ok(ENGINE.resolve(x, K.remedy.tc, { action: 'SARS disallowed the section 18A donation of R25,000.00; the receipt is valid', evidence: 'Section18A_receipt_2026.pdf' }), 'remedy resolve ASM-02');
+        drive('remedy', 'G14');
+      }],
+      ['2026-09-15 17:20', () => { ok(ENGINE.portal(K.remedy.c, 'decide', { choice: 'instruct', note: 'Please object: the donation receipt is valid' }), 'remedy decide'); }],
+      ['2026-09-22 10:30', () => { ok(ENGINE.chooseRemedy(K.remedy.c, K.remedy.tc, 'objection', { evidence: 'Section 18A receipt from an approved public benefit organisation' }), 'remedy objection'); }],
+    ]);
+    /* ---------- 16. Closed: G14 accepted, the retention date set (age 76: tertiary rebate, 65+ medical credits) ---------- */
+    story('closed', [
+      ['2026-07-14 09:00', () => { open('closed', { items: ['irp5', 'medical', 'it3b'], priorYear: ['employment', 'medical', 'interest'] }); drive('closed', 'G05'); }],
+      ['2026-07-17 10:00', () => { extract('closed', IRP5(296000, 28400).concat(MED(69600, 41200), [ln('it3b', 'IT3(b): local interest', 'interest', 88000)]), { months: 12, dependants: 1 }); calc('closed'); rel('closed', 'G05'); }],
+      ['2026-07-18 11:00', () => { drive('closed', 'G18'); }],
+      ['2026-07-22 09:30', () => { file('closed'); }],
+      ['2026-07-31 06:00', () => { ita34('closed', 'ITA34-2026-5102266', '2026-07-31', K.closed.c.calc.summary); }],
+      ['2026-08-04 10:00', () => { drive('closed', 'G14'); }],
+      ['2026-08-07 12:30', () => { ok(ENGINE.portal(K.closed.c, 'decide', { choice: 'accept', note: '' }), 'closed decide'); }],
+    ]);
+
+    steps.sort((a, b) => (a.when < b.when ? -1 : a.when > b.when ? 1 : 0));
+    steps.forEach((s) => { try { at(s.when, s.fn); } catch (e) { P.push(s.key + ' at ' + s.when + ': ' + e.message); } });
+    at('2026-11-09 08:58', () => ENGINE.watch());
+  };
+})();
+SEEDERS.push(() => { DEMO.problems = []; DEMO.keys = {}; if (DEMO.cases) DEMO_SEED(); });
 
 /* ===================== review.js ===================== */
 /* Review layer: a note on every section, Wix-style arranging per page, a layout viewer and the Review notes inbox.
