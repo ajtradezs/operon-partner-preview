@@ -232,6 +232,14 @@ const DEMO_SEED = (() => {
       ['2026-11-06 10:20', () => {
         ENGINE.raise(K.verification.c, 'VRF-05', { by: ai, note: 'Proof of the R12,800.00 out-of-pocket medical expenses is missing from the response pack' });
       }],
+      // Overnight: the AI indexes the response pack for the consultant's review (it cannot pass G11 itself).
+      ['2026-11-09 02:10', () => {
+        ok(ENGINE.draftResponse(K.verification.c, ai, 'vrf', [
+          { q: 'Retirement annuity certificates for every fund', a: 'One fund: R96,000.00 on the certificate', evidence: 'RA_certificate_2026.pdf' },
+          { q: 'Medical scheme tax certificate', a: 'Contributions R55,200.00 for 12 months, two dependants', evidence: 'Medical_scheme_certificate_2026.pdf' },
+          { q: 'Proof of out-of-pocket medical expenses', a: 'Still missing: the R12,800.00 of receipts (VRF-05)', evidence: null },
+        ]), 'verification overnight pack index');
+      }],
     ]);
     /* ---------- 14. Assessment: ASM-02 the ITA34 differs (SARS used R42,000.00 for the retirement annuity); G13 pending ---------- */
     story('assessment', [

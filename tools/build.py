@@ -2,6 +2,10 @@
 
 Usage:  python -I tools/build.py            regenerate src/itr12/register.gen.js (when the workbook is present) and build index.html
         python -I tools/build.py --check    regenerate the register in memory and fail if the committed file differs
+        python -I tools/build.py --out DIR/index.html [--only views-cases,views-case]
+                                            a private build: no regeneration and nothing written in the repo; --only keeps just
+                                            the named screen modules (views-kit.js and views.css always stay), so unfinished work
+                                            on other screens cannot break it
 
 The exception register workbook and the master workflow document are read-only inputs. They live outside this repository,
 in the Operon working folder (the parent of this repo, or OPERON_ITR12_DIR). Their contents are never copied here except
@@ -30,7 +34,7 @@ SORTABLE = ('<script async src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/
             'crossorigin="anonymous" referrerpolicy="no-referrer"></script>')
 
 # Assembly order. Each file is inlined whole; later modules may use globals from earlier ones.
-CSS_ORDER = ["shell/shell.css", "review.css", "itr12/views.css", "papersync.css"]
+CSS_ORDER = ["shell/shell.css", "review.css", "itr12/views.css", "itr12/views-cases.css", "itr12/views-ops.css", "itr12/views-admin.css", "papersync.css"]
 JS_ORDER = [
     "shell/shell.js",        # utilities, dialogs, header, sign-in, render/events (no boot)
     "sync.js",               # declares EXT_FIELD and SYNC
@@ -38,6 +42,7 @@ JS_ORDER = [
     "itr12/workflow.gen.js", # generated from the master workflow document
     "itr12/workflow.js", "itr12/roles.js", "itr12/dates.js", "itr12/ruleset-2026.js", "itr12/calc.js",
     "itr12/engine.js", "itr12/seed.js",
+    "itr12/views-kit.js",    # shared helpers for the screens
     "itr12/views-today.js", "itr12/views-cases.js", "itr12/views-case.js", "itr12/views-clients.js",
     "itr12/views-approvals.js", "itr12/views-exceptions.js", "itr12/views-sars.js", "itr12/views-deadlines.js",
     "itr12/views-controls.js", "itr12/views-records.js", "itr12/views-try.js", "itr12/views-import.js",
@@ -385,12 +390,17 @@ def read(rel: str) -> str:
     return (SRC / rel).read_text(encoding="utf-8")
 
 
-def assemble() -> tuple[str, str, list[str]]:
+SCREEN = re.compile(r"^(itr12/views-[a-z]+|papersync)\.(js|css)$")
+ALWAYS = {"itr12/views-kit.js", "itr12/views.css"}
+
+
+def assemble(only: set[str] | None = None) -> tuple[str, str, list[str]]:
     missing = [p for p in REQUIRED if not (SRC / p).exists()]
     if missing:
         raise SystemExit("Missing required sources: %s" % missing)
-    css = [p for p in CSS_ORDER if (SRC / p).exists()]
-    js = [p for p in JS_ORDER if (SRC / p).exists()]
+    keep = lambda p: only is None or p in ALWAYS or not SCREEN.match(p) or Path(p).stem in only
+    css = [p for p in CSS_ORDER if (SRC / p).exists() and keep(p)]
+    js = [p for p in JS_ORDER if (SRC / p).exists() and keep(p)]
     build = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     style = "\n".join("/* ===== %s ===== */\n%s" % (p, read(p)) for p in css)
     script = "\n".join("/* ===================== %s ===================== */\n%s" % (p, read(p)) for p in js)
@@ -435,13 +445,19 @@ def main(argv):
         generate_register(check_only=True)
         generate_workflow(check_only=True)
         return
-    generate_register()
-    generate_workflow()
-    html, build, js = assemble()
+    out = Path(argv[argv.index("--out") + 1]) if "--out" in argv else None
+    only = set(argv[argv.index("--only") + 1].split(",")) if "--only" in argv else None
+    if out is None:
+        generate_register()
+        generate_workflow()
+    html, build, js = assemble(only)
     check(html)
-    (ROOT / "index.html").write_text(html, encoding="utf-8", newline="\n")
-    (ROOT / ".nojekyll").touch(exist_ok=True)
-    print("Built index.html: %d characters; build %s; %d scripts (%s)" % (len(html), build, len(js), ", ".join(js)))
+    target = out or ROOT / "index.html"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(html, encoding="utf-8", newline="\n")
+    if out is None:
+        (ROOT / ".nojekyll").touch(exist_ok=True)
+    print("Built %s: %d characters; build %s; %d scripts (%s)" % (target.name if out is None else target, len(html), build, len(js), ", ".join(js)))
 
 
 if __name__ == "__main__":

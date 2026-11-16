@@ -52,10 +52,12 @@ def site():
     if live:
         yield live if live.endswith("/") else live + "/"
         return
-    stale = stale_build()
-    if stale:
-        pytest.exit(f"Stale build: {stale}. Run `python -I tools/build.py` first.", returncode=1)
-    srv =socketserver.ThreadingTCPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(ROOT)))
+    private = os.environ.get("OPERON_PREVIEW_DIR")  # a private build: tools/build.py --out DIR/index.html [--only ...]
+    if not private:
+        stale = stale_build()
+        if stale:
+            pytest.exit(f"Stale build: {stale}. Run `python -I tools/build.py` first.", returncode=1)
+    srv = socketserver.ThreadingTCPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(Path(private) if private else ROOT)))
     srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_address[1]}/"

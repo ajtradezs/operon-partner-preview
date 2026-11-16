@@ -1,0 +1,115 @@
+/* Shared styles for the ITR12 screens (views-kit.js). Built on the shell's --op-* tokens, so light and dark mode follow the theme.
+   At 760px and below nothing scrolls the page sideways: tables become labelled cards and long words wrap. */
+
+/* Page and sections */
+.vk-page{min-width:0}
+.vk-headtext{display:flex;flex-direction:column;gap:6px;min-width:0}
+.vk-sec{display:flex;flex-direction:column;gap:10px;min-width:0}
+.card.vk-sec h2+*{margin-top:0}
+.vk-sec-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.vk-sec-h h2{margin-right:2px}
+.vk-sec-a{margin-left:auto;display:inline-flex;flex-wrap:wrap;gap:6px 12px;font-size:14px}
+.vk-sec-intro{font-size:13px;color:var(--op-ink-muted);max-width:90ch}
+.vk-grid{align-items:start}
+.vk-sec a,.vk-empty,.vk-row-t,.vk-tablewrap td{overflow-wrap:anywhere}
+
+/* Chips: gate state, severity, exception code. Every chip carries a word, never colour alone. */
+.vk-gate,.vk-sev,.vk-code{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap;border:1px solid transparent;vertical-align:middle}
+.vk-gate{border-radius:999px;padding:0 9px}
+.vk-gate b{font-family:var(--font-mono);font-weight:700}
+.vk-g-done{background:var(--op-tier-auto-bg);color:var(--op-tier-auto-text)}
+.vk-g-sars{background:var(--op-surface-2);color:var(--op-info);border-color:var(--op-info)}
+.vk-g-ready{background:var(--op-accent-soft);color:var(--op-ink);border-color:var(--op-accent)}
+.vk-g-blocked{background:var(--op-tier-held-bg);color:var(--op-tier-held-text);border-color:var(--op-tier-held-fg)}
+.vk-g-prog{background:var(--op-warning-soft);color:var(--op-ink);border-color:var(--op-warning)}
+.vk-g-idle{background:var(--op-surface-2);color:var(--op-ink-muted)}
+.vk-g-reopen{background:var(--op-surface);color:var(--op-danger);border-color:var(--op-danger);border-style:dashed}
+.vk-g-na{background:transparent;color:var(--op-ink-muted);border-color:var(--op-rule);border-style:dashed}
+.vk-sev{border-radius:4px;padding:0 7px}
+.vk-s1{background:var(--op-tier-held-bg);color:var(--op-tier-held-text);border-color:var(--op-tier-held-fg)}
+.vk-s1::before{content:"";width:8px;height:8px;background:currentColor;flex:none}
+.vk-s2{background:var(--op-tier-hold-bg);color:var(--op-tier-hold-text);border-color:var(--op-tier-hold-fg)}
+.vk-s2::before{content:"";width:7px;height:7px;border:2px solid currentColor;flex:none}
+.vk-s3{background:var(--op-surface-2);color:var(--op-ink);border-color:var(--op-rule)}
+.vk-s4{background:transparent;color:var(--op-ink-muted);border-color:var(--op-rule)}
+.vk-code{font-family:var(--font-mono);font-variant-numeric:tabular-nums;border-radius:4px;padding:0 6px;background:var(--op-surface-2);border-color:var(--op-rule);color:var(--op-ink);text-decoration:none}
+a.vk-code:hover{border-color:var(--op-accent);color:var(--op-accent)}
+.vk-codes{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin-top:4px}
+.pill.info{color:var(--op-info)}
+.vk-masked{letter-spacing:.02em;white-space:nowrap}
+
+/* Tables: inside a section the table sits flush with the card edges */
+.vk-sec>.vk-tablewrap{margin-inline:-16px;border-inline:0;border-radius:0}
+.vk-sec>.vk-tablewrap:not(:has(~ :not(.rv-pin,[data-rv-ui]))){margin-bottom:-16px;border-bottom:0;border-radius:0 0 var(--r) var(--r)}
+.vk-tablewrap td{min-width:0}
+.vk-cell{min-width:0}
+.vk-tablewrap td .small{margin-top:2px}
+.vk-tablewrap td.vk-act,.vk-tablewrap th.vk-act{text-align:right;white-space:nowrap}
+.vk-tablewrap td.vk-act .lock{white-space:normal;text-align:left;justify-content:flex-start;align-items:flex-start;max-width:28ch}
+.vk-tablewrap td.vk-act .lock>svg{flex:none;margin-top:3px}
+.vk-tablewrap td .pill{margin-bottom:2px}
+@media (max-width:760px){
+  .vk-cards{overflow:visible}
+  .vk-cards table,.vk-cards tbody,.vk-cards tr,.vk-cards td{display:block;width:100%}
+  .vk-cards thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .vk-cards tr{padding:10px 16px;border-bottom:1px solid var(--op-rule)}
+  .vk-cards tr:last-child{border-bottom:0}
+  .vk-cards td{display:grid;grid-template-columns:minmax(76px,32%) minmax(0,1fr);gap:2px 10px;padding:3px 0;border:0;font-size:14px}
+  .vk-cards td::before{content:attr(data-label);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--op-ink-muted);padding-top:2px}
+  .vk-cards td[data-label=""]{display:block;padding-top:8px}
+  .vk-cards td[data-label=""]::before{content:none}
+  .vk-tablewrap td.vk-act{text-align:left;white-space:normal}
+  .vk-tablewrap td.vk-act .lock{max-width:none}
+  .vk-tablewrap:not(.vk-cards){max-width:100%}
+}
+
+/* Row lists: a date box or a time, then the text */
+.vk-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.vk-list>li{border-top:1px solid var(--op-rule);padding:10px 0}
+.vk-list>li:first-child{border-top:0;padding-top:2px}
+.vk-list>li:last-child{padding-bottom:0}
+.vk-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start}
+.vk-row-log{grid-template-columns:112px minmax(0,1fr)}
+.vk-row-b{display:flex;flex-direction:column;gap:3px;min-width:0}
+.vk-row-t{font-weight:500;font-size:14px;line-height:1.4}
+.vk-meta{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:13px;color:var(--op-ink-muted);min-width:0}
+.vk-meta .vk-codes{margin-top:0}
+.vk-when{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--op-ink-muted);padding-top:2px;white-space:nowrap}
+.vk-list-quiet>li{padding:8px 0}
+@media (max-width:520px){.vk-row-log{grid-template-columns:minmax(0,1fr);gap:2px}}
+
+/* Empty states */
+.vk-empty{display:flex;gap:10px;align-items:flex-start;border:1px dashed var(--op-border);border-radius:var(--r);padding:12px 14px;color:var(--op-ink-muted);font-size:14px;min-width:0}
+.vk-empty>svg{flex:none;margin-top:4px;color:var(--op-success)}
+.vk-empty>div{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
+.vk-empty>div>p:first-child{color:var(--op-ink)}
+.vk-empty .vk-list{color:var(--op-ink)}
+
+/* Dialog pieces: G18 checks and the all-clear line */
+.vk-checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.vk-checks li{display:flex;gap:8px;align-items:flex-start}
+.vk-checks li>svg{flex:none;margin-top:4px}
+.vk-checks li.ok>svg{color:var(--op-success)}
+.vk-checks li.bad>svg{color:var(--op-danger)}
+.vk-okline{display:flex;gap:8px;align-items:center;color:var(--op-success);font-weight:600;font-size:14px}
+
+/* The gate tracker on the case page: the board's columns in order, each with its gates. Wraps instead of scrolling. */
+.vk-track{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.vk-tcol{display:flex;flex-direction:column;gap:6px;border:1px solid var(--op-rule);border-radius:8px;padding:8px 10px;background:var(--op-surface);min-width:0}
+.vk-tcol.now{border-color:var(--op-accent);background:var(--op-accent-soft)}
+.vk-tcol-h{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--op-ink-muted)}
+.vk-tcol.now .vk-tcol-h{color:var(--op-ink)}
+.vk-tcol ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.vk-tk{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;font-weight:600;border-radius:6px;padding:2px 8px;border:1px solid transparent;min-width:0}
+.vk-tk b{font-family:var(--font-mono)}
+.vk-tk span{text-align:right;min-width:0}
+.vk-tk.now{outline:2px solid var(--op-accent);outline-offset:1px}
+@media (max-width:420px){.vk-track{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+
+/* Phones: the shell's 16px gutter stays; nothing inside a card may push the page wider */
+@media (max-width:760px){
+  .vk-sec{padding:14px 16px}
+  .vk-sec>.vk-tablewrap{margin-inline:-16px}
+  .vk-sec>.vk-tablewrap:not(:has(~ :not(.rv-pin,[data-rv-ui]))){margin-bottom:-14px}
+  .vk-sec-a{margin-left:0;flex-basis:100%}
+}
