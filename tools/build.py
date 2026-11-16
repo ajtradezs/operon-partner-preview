@@ -35,6 +35,7 @@ JS_ORDER = [
     "shell/shell.js",        # utilities, dialogs, header, sign-in, render/events (no boot)
     "sync.js",               # declares EXT_FIELD and SYNC
     "itr12/register.gen.js", # generated from the workbook
+    "itr12/workflow.gen.js", # generated from the master workflow document
     "itr12/workflow.js", "itr12/roles.js", "itr12/dates.js", "itr12/ruleset-2026.js", "itr12/calc.js",
     "itr12/engine.js", "itr12/seed.js",
     "itr12/views-today.js", "itr12/views-cases.js", "itr12/views-case.js", "itr12/views-clients.js",
@@ -90,16 +91,19 @@ def label_rules(tok: str):
         ("owner", r"^AI Agent / PaperSync$", "AI Agent / Operon (system)", "AI Agent / PaperSync"),
         ("owner", r"^Records Owner$", "Records/Compliance Owner", "Records Owner"),
         ("owner", r"^Compliance Owner$", "Records/Compliance Owner", "Compliance Owner"),
-        # Prose (applied to every other cell)
+        # Prose (applied to every other cell or paragraph)
         ("text", rf"\b{t} / PaperSync ITR12 Exception Register\b", "ITR12 Exception Register", "[firm] / PaperSync ITR12 Exception Register"),
+        ("text", rf"^{t} / PaperSync$", "PaperSync", "[firm] / PaperSync (document title)"),
         ("text", rf"\bFinal {t} submission approval\b", "Final firm submission approval", "Final [firm] submission approval"),
         ("text", rf"\b{t} tax calculator\b", "firm’s tax calculator", "[firm] tax calculator"),
         ("text", rf"\bdiffers from {t} calculation\b", "differs from the firm’s calculation", "differs from [firm] calculation"),
         ("text", rf"\binstructs {t}\b", "instructs the firm", "instructs [firm]"),
+        ("text", rf"\b{t} is authorised\b", "the firm is authorised", "[firm] is authorised"),
+        ("text", rf"\b{t} tax operations\b", "the firm’s tax operations", "[firm] tax operations"),
         ("text", rf"\bClient/{t}\b", "Client/firm", "Client/[firm]"),
         ("text", rf"\b{t} Tax Consultant\b", "Tax Consultant", "[firm] Tax Consultant"),
         ("text", rf"\b{t} Administrator\b", "Administrator", "[firm] Administrator"),
-        ("text", rf"\b{t}\b", "the firm", "[firm] (any other mention)"),
+        ("text", rf"\b{t}\b", "firm", "[firm] (any other mention, e.g. “[firm] calculation”)"),
     ]
 
 
@@ -199,6 +203,161 @@ def register_js(reg: dict) -> str:
     return "\n".join(out) + "\n"
 
 
+# ---------------------------------------------------------------- workflow generation (from the master workflow docx)
+PHASE_RE = re.compile(r"^PHASE (\d+): (.+)$")
+STEP_RE = re.compile(r"^(\d+)\. (.+)$")
+GATE_RE = re.compile(r"^G\d\d$")
+
+
+def docx_blocks(path: Path):
+    import docx  # python-docx; the document is only read
+    from docx.oxml.ns import qn
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    d = docx.Document(str(path))
+    out = []
+    for child in d.element.body.iterchildren():
+        if child.tag == qn("w:p"):
+            p = Paragraph(child, d)
+            t = p.text.strip()
+            if t:
+                out.append(("p", p.style.name, t))
+        elif child.tag == qn("w:tbl"):
+            rows = []
+            for r in Table(child, d).rows:
+                cells, prev = [], None
+                for c in r.cells:
+                    if c._tc is prev:  # merged cell repeated by python-docx
+                        continue
+                    prev = c._tc
+                    cells.append(c.text.strip())
+                rows.append(cells)
+            out.append(("t", rows))
+    return out
+
+
+def read_workflow(path: Path, tok: str) -> dict:
+    lab = Labeller(tok)
+    T = lambda s: lab.apply(s, False)  # noqa: E731
+    blocks = docx_blocks(path)
+    title, meta, sections, phases = [], [], [], []
+    sec = sub = phase = step = group = None
+
+    def new_sec(name):
+        return {"title": name, "text": [], "bullets": [], "numbered": [], "tables": [], "subs": []}
+
+    for b in blocks:
+        if b[0] == "t":
+            rows = [[T(c) for c in r] for r in b[1]]
+            if phase is not None and rows and GATE_RE.match(rows[0][0]):
+                lines = [ln.strip() for ln in rows[0][1].split("\n") if ln.strip()]
+                box = {"gate": rows[0][0], "control": lines[0], "owner": "", "pass": "", "notes": []}
+                for ln in lines[1:]:
+                    if ln.startswith("Owner:"):
+                        box["owner"] = ln[len("Owner:"):].strip()
+                    elif ln.startswith("PASS:"):
+                        box["pass"] = ln[len("PASS:"):].strip()
+                    else:
+                        box["notes"].append(ln)
+                phase["gates"].append(box)
+            elif sec is None:
+                meta.extend(rows)
+            else:
+                (sub or sec)["tables"].append(rows)
+            continue
+        _, style, text = b
+        text = T(text)
+        if style == "Heading 1":
+            m = PHASE_RE.match(text)
+            sub = step = group = None
+            if m:
+                phase = {"n": int(m.group(1)), "title": m.group(2), "steps": [], "gates": []}
+                phases.append(phase); sec = None
+            else:
+                phase = None; sec = new_sec(text); sections.append(sec)
+            continue
+        if phase is not None:
+            if style != "Heading 2" and step is None:
+                raise SystemExit("Workflow document: text before the first step of phase %d: %s" % (phase["n"], text[:60]))
+            if style == "Heading 2":
+                m = STEP_RE.match(text)
+                step = {"n": int(m.group(1)) if m else None, "title": m.group(2) if m else text, "responsible": "", "system": "",
+                        "reviewer": "", "text": [], "items": [], "ordered": False, "groups": []}
+                phase["steps"].append(step); group = None
+            elif style == "Heading 3":
+                group = {"title": text, "items": []}; step["groups"].append(group)
+            elif style in ("List Bullet", "List Number"):
+                (group or step)["items"].append(text)
+                if style == "List Number" and group is None:
+                    step["ordered"] = True
+            elif text.startswith("Responsible:") and step is not None and not step["responsible"]:
+                for part in text.split(" | "):
+                    k, _, v = part.partition(":")
+                    key = {"Responsible": "responsible", "System": "system", "Reviewer": "reviewer"}.get(k.strip())
+                    if key:
+                        step[key] = v.strip()
+            else:
+                step["text"].append(text)
+            continue
+        if sec is None:  # front matter: three title lines, then a titled note ("Working-document principle")
+            if len(title) < 3:
+                title.append(text)
+            else:
+                sec = new_sec(text); sections.append(sec)
+            continue
+        if style == "Heading 2" or style == "Heading 3":
+            sub = new_sec(text); sec["subs"].append(sub)
+        elif style == "List Bullet":
+            (sub or sec)["bullets"].append(text)
+        elif style == "List Number":
+            (sub or sec)["numbered"].append(text)
+        else:
+            (sub or sec)["text"].append(text)
+    return {
+        "source": {"file": public_name(path), "sha256": sha256(path),
+                   "note": "Generated read-only from the master workflow document. Text is verbatim apart from the firm prefix, shown firm-neutral."},
+        "labelMap": lab.table(), "title": title, "meta": meta, "phases": phases, "sections": sections,
+    }
+
+
+def workflow_js(wf: dict) -> str:
+    out = ["/* GENERATED by tools/build.py from the ITR12 master workflow document. Do not edit by hand. */",
+           "const WORKFLOW = {"]
+    for key in ("source", "labelMap", "title", "meta"):
+        out.append(f"  {key}: " + js_value(wf[key]) + ",")
+    for key in ("phases", "sections"):
+        out.append(f"  {key}: [")
+        out.extend("    " + js_value(x) + "," for x in wf[key])
+        out.append("  ],")
+    out.append("};")
+    return "\n".join(out) + "\n"
+
+
+WORKFLOW_JS = SRC / "itr12" / "workflow.gen.js"
+
+
+def generate_workflow(check_only=False) -> str | None:
+    path, tok = workflow_path(), firm_token()
+    if not path or not tok:
+        print("Workflow document not found in", INPUTS, "- using the committed", WORKFLOW_JS.relative_to(ROOT))
+        return None
+    before = sha256(path)
+    text = workflow_js(read_workflow(path, tok))
+    if sha256(path) != before:
+        raise SystemExit("The workflow document changed while it was being read")
+    if tok.lower() in text.lower():
+        raise SystemExit("The firm prefix leaked into the generated workflow")
+    if check_only:
+        cur = WORKFLOW_JS.read_text(encoding="utf-8") if WORKFLOW_JS.exists() else ""
+        if cur != text:
+            raise SystemExit("workflow.gen.js is out of date with the document; run tools/build.py")
+        print("workflow.gen.js matches the document (sha256 %s)" % before)
+        return text
+    WORKFLOW_JS.write_text(text, encoding="utf-8", newline="\n")
+    return text
+
+
 def generate_register(check_only=False) -> str | None:
     xlsx, tok = register_path(), firm_token()
     if not xlsx or not tok:
@@ -274,8 +433,10 @@ def check(html: str):
 def main(argv):
     if "--check" in argv:
         generate_register(check_only=True)
+        generate_workflow(check_only=True)
         return
     generate_register()
+    generate_workflow()
     html, build, js = assemble()
     check(html)
     (ROOT / "index.html").write_text(html, encoding="utf-8", newline="\n")

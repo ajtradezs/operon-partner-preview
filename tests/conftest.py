@@ -34,13 +34,28 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+def stale_build():
+    """index.html is assembled from src/ by tools/build.py. Testing an older build would test older code, so say which file is newer."""
+    built = ROOT / "index.html"
+    if not built.exists():
+        return "index.html is missing"
+    sources = [p for p in (ROOT / "src").rglob("*") if p.is_file()] + [ROOT / "tools" / "build.py"]
+    newest = max(sources, key=lambda p: p.stat().st_mtime)
+    if newest.stat().st_mtime > built.stat().st_mtime:
+        return f"{newest.relative_to(ROOT).as_posix()} is newer than index.html"
+    return None
+
+
 @pytest.fixture(scope="session")
 def site():
     live = os.environ.get("OPERON_PREVIEW_URL")  # e.g. the GitHub Pages URL, to run the same checks against the published site
     if live:
         yield live if live.endswith("/") else live + "/"
         return
-    srv = socketserver.ThreadingTCPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(ROOT)))
+    stale = stale_build()
+    if stale:
+        pytest.exit(f"Stale build: {stale}. Run `python -I tools/build.py` first.", returncode=1)
+    srv =socketserver.ThreadingTCPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(ROOT)))
     srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_address[1]}/"
