@@ -39,6 +39,7 @@ Reloading resets the demo work. **Reset the demo data** on the Account page puts
 `index.html` is generated. A build script adapts the original demo and inlines the sources in `src/`:
 
 - `sync.js`, `review.js` and `review.css` are the review layer.
-- `collections.js` and `collections.css` are Document collections.
+- `papersync.js` and `papersync.css` are PaperSync: the firm's document requests and the simulated client portal.
+- `itr12/` holds the ITR12 workflow, the gate engine, the demo cases and the screens.
 
 Edit `src/`, rebuild, then run the browser tests with `python -m pytest tests -q` (Playwright for Python). The live-sync tests need a test access code and skip without one. The real Operon app is separate and private; this static site does not connect to it.

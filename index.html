@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-build="20261117T062728Z"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="description" content="Operon partner preview: the ITR12 workflow with made-up data and simulated logins.">
+<html lang="en" data-build="20261117T074626Z"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="description" content="Operon partner preview: the ITR12 workflow with made-up data and simulated logins.">
 <title>Operon · ITR12 partner preview</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,6 +92,8 @@ input.sr:focus-visible+label.btn{outline:2px solid var(--op-focus);outline-offse
 
 .wrap{max-width:1312px;margin:0 auto;padding-inline:16px;padding-block:20px 72px}
 @media (min-width:900px){.wrap,.bar{padding-inline:24px}.nav{padding-inline:20px}}
+/* Seventeen tabs do not fit one row at 1280px: above phone width the menu wraps to a second row instead of scrolling. */
+@media (min-width:761px){.nav{flex-wrap:wrap;row-gap:2px}}
 .stack{display:flex;flex-direction:column;gap:16px;min-width:0}
 .row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;min-width:0}
 .between{justify-content:space-between}
@@ -1533,7 +1535,7 @@ function tick() {
 }
 
 /* ===================== sync.js ===================== */
-// Shared field-handler map used by onField() for data-on inputs. Keep it first: collections.js uses it too.
+// Shared field-handler map used by onField() for data-on inputs. Keep it first: the ITR12 screens and papersync.js add to it.
 const EXT_FIELD = {};
 
 /* Local-first synced store for review notes, statuses, layouts, suggested pages and feedback.
@@ -8477,7 +8479,7 @@ const ADM = (() => {
 
 /* ===================== papersync.js ===================== */
 /* PaperSync: the firm's side (requests board, checklist template, KYC requests, questionnaire, reminders, settings and portal
-   links) and the client's PaperSync portal (#portal-<caseId>). Evolved from the old Document collections module (src/collections.js):
+   links) and the client's PaperSync portal (#portal-<caseId>). Evolved from the old Document collections module (since removed):
    it keeps the portal flow (verify, checklist with upload, N/A and drop-on-row, submit), the reminders cadence and the simulated
    WhatsApp, email and link messages, but its data now comes from the ITR12 cases.
    Views only read state. Firm actions go through ENGINE with ACTOR.me(); every portal action goes through ENGINE.portal(), which
@@ -9069,6 +9071,11 @@ function rvFirstWords(el) {
 }
 function rvLabel(el) {
   for (const c of el.classList) if (RV_STRUCT[c]) return RV_STRUCT[c];
+  // A row of columns is named after every block in it, not after its first block's heading.
+  if (el.matches('.grid2')) {
+    const hs = Array.from(el.children).filter((c) => !c.hasAttribute('data-rv-ui')).map((c) => rvHeading(c)).filter(Boolean);
+    if (hs.length > 1) return rvClean('Columns: ' + hs.join(' · '), 120);
+  }
   const h = rvHeading(el); if (h) return h;
   const al = el.getAttribute('aria-label'); if (al) return rvClean(al, 80);
   return rvClean(rvFirstWords(el), 50) || el.tagName.toLowerCase();

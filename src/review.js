@@ -130,6 +130,11 @@ function rvFirstWords(el) {
 }
 function rvLabel(el) {
   for (const c of el.classList) if (RV_STRUCT[c]) return RV_STRUCT[c];
+  // A row of columns is named after every block in it, not after its first block's heading.
+  if (el.matches('.grid2')) {
+    const hs = Array.from(el.children).filter((c) => !c.hasAttribute('data-rv-ui')).map((c) => rvHeading(c)).filter(Boolean);
+    if (hs.length > 1) return rvClean('Columns: ' + hs.join(' · '), 120);
+  }
   const h = rvHeading(el); if (h) return h;
   const al = el.getAttribute('aria-label'); if (al) return rvClean(al, 80);
   return rvClean(rvFirstWords(el), 50) || el.tagName.toLowerCase();

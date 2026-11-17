@@ -84,6 +84,8 @@ input.sr:focus-visible+label.btn{outline:2px solid var(--op-focus);outline-offse
 
 .wrap{max-width:1312px;margin:0 auto;padding-inline:16px;padding-block:20px 72px}
 @media (min-width:900px){.wrap,.bar{padding-inline:24px}.nav{padding-inline:20px}}
+/* Seventeen tabs do not fit one row at 1280px: above phone width the menu wraps to a second row instead of scrolling. */
+@media (min-width:761px){.nav{flex-wrap:wrap;row-gap:2px}}
 .stack{display:flex;flex-direction:column;gap:16px;min-width:0}
 .row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;min-width:0}
 .between{justify-content:space-between}

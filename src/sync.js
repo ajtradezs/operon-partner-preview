@@ -1,4 +1,4 @@
-// Shared field-handler map used by onField() for data-on inputs. Keep it first: collections.js uses it too.
+// Shared field-handler map used by onField() for data-on inputs. Keep it first: the ITR12 screens and papersync.js add to it.
 const EXT_FIELD = {};
 
 /* Local-first synced store for review notes, statuses, layouts, suggested pages and feedback.

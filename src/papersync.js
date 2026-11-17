@@ -1,5 +1,5 @@
 /* PaperSync: the firm's side (requests board, checklist template, KYC requests, questionnaire, reminders, settings and portal
-   links) and the client's PaperSync portal (#portal-<caseId>). Evolved from the old Document collections module (src/collections.js):
+   links) and the client's PaperSync portal (#portal-<caseId>). Evolved from the old Document collections module (since removed):
    it keeps the portal flow (verify, checklist with upload, N/A and drop-on-row, submit), the reminders cadence and the simulated
    WhatsApp, email and link messages, but its data now comes from the ITR12 cases.
    Views only read state. Firm actions go through ENGINE with ACTOR.me(); every portal action goes through ENGINE.portal(), which
