@@ -151,12 +151,26 @@ const POLICY_PENDING = ['overridable', 'warnDays', 'materiality', 'aiConfidence'
 /* ---------- Exception handling rules ---------- */
 // No override may bypass a statutory restriction, missing taxpayer authority, a security control or SARS-interface authorisation.
 const NEVER_OVERRIDE = {
-  authority: ['CLT-04', 'CLT-06', 'PRE-03', 'SUB-05'],
-  security: ['DOC-04', 'DOC-10'],  // plus every SEC-* code
+  authority: [
+    'KYC-04',  // the client refuses or cannot give the mandate or engagement information: no authority to act
+    'KYC-05',  // the appointment letter and mandate are unsigned, incomplete or out of scope: no authority to act
+    'CLT-04',  // the client withholds authority to submit
+    'CLT-06',  // the client withdraws approval or authority
+    'PRE-03',  // no valid client authority for the version being submitted
+    'SUB-05',  // a submission after the client withdrew authority
+  ],
+  security: ['DOC-04', 'DOC-10'],  // another taxpayer's document; an unsafe file. Plus every SEC-* code (families below)
+  statutory: [
+    'KYC-06',  // POPIA privacy notice and consent incomplete: a statutory restriction on processing personal information
+  ],
+  sarsInterface: [
+    'MD-06',   // the taxpayer identity or tax-reference link the SARS interface relies on fails (it maps to G18)
+  ],
   families: { SEC: 'a security control', INT: 'SARS-interface authorisation', RET: 'a statutory hold' },
 };
-// Resolved only by the client's own PaperSync portal action (fresh, explicit, version-specific approval).
-const PORTAL_ONLY = ['CLT-02', 'CLT-04', 'CLT-05', 'CLT-06'];
+// Resolved only by the client's own PaperSync portal action (fresh, explicit, version-specific approval). CLT-02 is not here: the
+// register makes the Tax Consultant its owner, who resolves it once the concern is investigated (and a revised pack issued if needed).
+const PORTAL_ONLY = ['CLT-04', 'CLT-05', 'CLT-06'];
 // Codes whose resolution criterion is the approval (and, where there is one, the SARS submission) of their own gate.
 // They mark which gates must be passed (again) instead of blocking them; passing those gates closes them.
 const BY_GATE = ['DA-01', 'VRF-01', 'AUD-02', 'VRF-04', 'AUD-03', 'REM-02', 'REM-03', 'REM-04', 'REM-05', 'REM-06', 'REM-08', 'SUB-04', 'CLT-07'];
@@ -217,6 +231,11 @@ const DOC_KINDS = [
   { kind: 'foreign', label: 'Foreign income statement', rx: /foreign|offshore/i },
   { kind: 'bank', label: 'Bank confirmation letter', rx: /bank conf|bank letter|bank statement/i },
   { kind: 'notice', label: 'SARS notice or letter', rx: /sars|notice|letter/i },
+  // Added for the step 5 questionnaire areas (trade or business, trust distributions, pension or annuity income, disability).
+  { kind: 'business', label: 'Business income and expense records', rx: /business|self.?employ|trading/i },
+  { kind: 'trust', label: 'Trust distribution statement', rx: /trust/i },
+  { kind: 'pension', label: 'Pension or annuity income certificate', rx: /pension/i },
+  { kind: 'disability', label: 'Confirmation of disability (ITR-DD)', rx: /itr.?dd|disab/i },
 ];
 
 /* ---------- Choices and gaps put to Johan (shown on the Controls page). The register wins where his files differ. ---------- */
@@ -236,4 +255,14 @@ const PENDING_JOHAN = [
   { id: 'q-ret', topic: 'Retention holds', text: 'The register raises RET-01 and RET-02 when retention expires while a verification, audit or dispute is still open. The preview records the hold when that process starts (TAA s32) and raises the RET code at the review date if the hold is still active.' },
   { id: 'q-da-name', topic: 'Declaration Alert', text: 'The documents say “Declaration Alert”. SARS’s eFiling guide (IT-AE-36-G06) calls it the “Declaration Questionnaire” and its filing-season 2026 page the “Alert Declaration questionnaire”. The preview uses Johan’s term. The guide says the questionnaire stays open for 24 working hours; the preview takes the response due date from the SARS notice and shows that window beside it.' },
   { id: 'q-multi-gate', topic: 'Codes mapped to several gates', text: 'QUE-03 (G03, G05), MD-04 (G02, G05), DOC-09 (G04, G05), CLT-03 (G05 to G07) and VER-03 (G07, G09) block every gate they are mapped to, so while one is open the earliest of those gates cannot pass, even where its resolution (for example “technical treatment is approved”) belongs to a later step. The preview has the owner resolve it at the earliest gate; the later gates then re-check the outcome through their own criteria.' },
+  { id: 'q-g10-da04', topic: 'G10 box vs register', text: 'The document’s G10 box lists DA-04 (“routed to verification”); the register maps DA-04 to G11 only. The preview follows the register for the exception. It follows the G10 box (“or move to verification”) for the gate: once SARS moves the questionnaire to verification, G10 passes without a response.' },
+  { id: 'q-conditional', topic: '“Conditional” blocking', text: 'The register marks AI-06, INT-03, INT-13 and INT-15 “Conditional” but does not say what the condition is. The preview reads it as: the code blocks its gates until the service is restored or a retry succeeds, or until a manual fallback is recorded by one person and reconciled by a different person. Other readings are possible: it could block only while the service is down, never block once a fallback is recorded, or block only for some transactions. Which does Johan mean?' },
+  { id: 'q-standins', topic: 'Who may resolve for the client, the AI or the system', text: 'Client-owned codes (QUE-01, QUE-02, QUE-04, DOC-01, DOC-03, DOC-07, DA-02, VRF-02, ASM-04, REM-07) may also be recorded as resolved by the Tax Consultant or the Administrator. DOC-05 (owner: AI Agent) and PRE-02 (owner: the system) may be resolved by the Tax Consultant.' },
+  { id: 'q-s3-gate', topic: 'S3 codes that block', text: 'The Instructions sheet says S3 holds the affected item while unrelated work continues. The Gate Map says a gate cannot be released while a blocking mapped exception is open. The preview follows the Gate Map: an S3 code marked Blocking = Yes stops every gate it is mapped to, not only the item.' },
+  { id: 'q-never-override', topic: 'Codes that may never be overridden', text: 'Missing taxpayer authority: KYC-04, KYC-05, CLT-04, CLT-06, PRE-03 and SUB-05. Security controls: DOC-04, DOC-10 and every SEC code. Statutory restrictions: KYC-06 (POPIA) and every RET code (statutory holds). SARS-interface authorisation: MD-06 and every INT code. The preview never offers these for override. Is the list complete?' },
+  { id: 'q-ai-lower', topic: 'The AI and severity', text: 'The document stops the AI lowering an S1 or S2 severity. The preview goes further: the AI may raise any severity but may not lower any, including S3 to S4.' },
+  { id: 'q-severity-blocking', topic: 'Severity and blocking', text: 'The register keeps Severity and Blocking as separate columns. In the preview a severity change never changes Blocking: a code the register marks blocking still blocks at S4. Only the code’s owner may ask to lower the severity of a blocking code, and the Records/Compliance Owner (a different person) approves it.' },
+  { id: 'q-g01-master', topic: 'What G01 checks', text: 'G01 checks the six KYC items on the client record. It does not check the Phase 1 client master fields. Which of those fields are mandatory before G01 can pass is Johan’s call.' },
+  { id: 'q-g01-scope', topic: 'G01 and G02 on each annual case', text: 'The document makes KYC (G01) and the SARS details check (G02) client-level, and creates the annual case after G02. The preview opens the annual case first and tracks G01 and G02 on it, so a returning client goes through them again each year.' },
+  { id: 'q-engagement', topic: 'Engagement terms', text: 'G01 asks for “Engagement terms accepted” as well as the five Phase 2 items. The signed appointment letter and mandate already cover scope, responsibilities and fees. Does Johan want separate engagement terms, or should the item go?' },
 ];

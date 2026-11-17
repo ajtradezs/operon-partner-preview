@@ -16,26 +16,9 @@ import pytest
 TZ = "Africa/Johannesburg"
 IA, TC, AD = "Integration Administrator", "Tax Consultant", "Administrator"
 
-# The screens a step needs but the preview does not have yet (each is a defect with its repro; see Flow.bridge).
-D_OPEN_CASE = ("No screen opens an ITR12 case for a client. Repro: Import clients > create a client > open the client page: "
-               "'Annual ITR12 cases' says 'No ITR12 case yet' and no screen offers to open one (only Try it and the seed call ENGINE.newCase).")
-D_G02_COMPARE = ("No screen records the G02 checklist item 'SARS registered details compared with the client record' for a new case, so G02 "
-                 "can never pass. Repro: open a new case, case page > Personalised checklist > Gate checklists: the G02 item shows 'To do' with no "
-                 "control, and Release G02 says 'Not ready: SARS registered details compared with the client record'.")
-D_EXTRACT = ("No screen records the extracted values for a new case (ENGINE.setInputs), so the calculation cannot run. Repro: after G04 passes, "
-             "case page > Calculation pack says 'No calculation yet: no values have been extracted.' and has no Recalculate button.")
-D_ITA34 = ("No screen brings an ITA34 in for a submitted return (ENGINE.receive), so G12 can never start. Repro: after a successful submission "
-           "the case sits in 'After filing'; SARS link > Inbound from SARS has nothing for it and no control adds one.")
-D_G13_ADVICE = ("No screen records the G13 checklist item 'Client advised of the assessment outcome', so G13 can never pass and the client "
-                "can never decide in the portal. Repro: case page of an assessed case > Gate checklists: the G13 item shows 'To do' with no "
-                "control; Release G13 says 'Not ready: Client advised of the assessment outcome'.")
-D_REMEDY = ("No screen lets the Tax Consultant choose a remedy (ENGINE.chooseRemedy) after the client instructs the firm. Repro: client "
-            "portal > 'I don't agree: ask my accountant to act'; the case page 'ITA34 and remedies' and the Exceptions screen offer no way to "
-            "choose the objection, and REM-01 says 'Choose the remedy route first'.")
-D_PLATFORM = ("After Try it > 'Restore 2026.1 and rerun', AI-07 (owner Platform Product Owner) and TAX-06 (closed by the Platform Product "
-              "Owner) cannot be resolved or closed on any screen, so every case that had a calculation stays blocked. Repro: run the ruleset "
-              "scenario, then restore; as Tax Consultant open the calcReady demo case: Release G05 says 'Blocked by AI-07 (S2), TAX-06 (S1)' "
-              "even after TAX-06 is resolved, and the AI-07 row says 'AI-07 is resolved by the Platform Product Owner (simulated platform team)'.")
+# Every step of the seven flows now has a screen: opening a case (client page), ticking gate checklist items and recording the
+# values read from each document (case page), the simulated SARS sending the ITA34 (SARS link), choosing the remedy (case page) and
+# the simulated platform team's part (exception buttons). Flow.bridge stays for any step a future change leaves without a screen.
 
 HIDE_REVIEW_UI = ".rv-bar,.rv-tip,[data-rv-ui]{display:none!important}"
 
@@ -135,10 +118,12 @@ class Flow:
             assert not t.startswith("Not done"), t
         return t
 
-    def dialog(self, fill=None, check=None, radio=None, ok=True):
+    def dialog(self, fill=None, check=None, radio=None, ok=True, select=None):
         """Fill the open dialog and press its submit button. Returns the toast (ok) or the error shown in the dialog (not ok)."""
         p = self.page
         p.wait_for_selector("#dlg[open] #dlg-ok")
+        for sel, val in (select or {}).items():
+            p.select_option(sel, val)
         for sel, val in (fill or {}).items():
             p.fill(sel, val)
         for sel in (check or []):
@@ -161,6 +146,15 @@ class Flow:
         t = self.dialog(fill={"#vk-rel-ev": "Checked on the screen"})
         assert t == f"Released {gate} for {case_id}.", t
         assert self.case(case_id, f"c.gates.{gate}.status") == "released"
+
+    def tick(self, case_id, gate):
+        """Tick every open checklist item of a gate with its 'Mark done' button on the case page (the gate owner's action)."""
+        keys = self.case(case_id, f"(c.req.{gate} || []).filter((r) => !r.done).map((r) => r.key)")
+        for k in keys:
+            t = self.act(f"[data-rv-key='cases-case-checklist'] button[data-act='cases.req'][data-case='{case_id}'][data-gate='{gate}'][data-key='{k}']")
+            assert t.startswith("Done: "), t
+        assert self.case(case_id, f"(c.req.{gate} || []).every((r) => r.done)")
+        return keys
 
     def portal(self, case_id):
         """Open the client's PaperSync portal from the firm's PaperSync page and pass the one-time code."""
@@ -258,31 +252,39 @@ def test_new_client_from_import_to_closed_and_retained(flow):
     f.follow(f"#client-{cl['id']}")
     assert "No ITR12 case yet" in f.text("[data-rv-key='adm-client-cases']")
 
-    # Opening the 2026 case: no screen does it.
-    case = f.bridge(D_OPEN_CASE, "id => ENGINE.newCase(ENGINE.clientOf(id), { items: ['irp5', 'medical'] }).id", cl["id"])
-    f.open_link(f"#client-{cl['id']}")
+    # Opening the 2026 case on the client page: the Administrator chooses the Tax Consultant and opens it.
+    n1 = f.audit_n()
+    f.click(f"[data-rv-key='adm-client-cases'] button[data-act='adm.newCase'][data-client='{cl['id']}']")
+    t = f.dialog(select={"#adm-nc-tc": "TC1"})
+    case = f.js("id => S.cases.filter((c) => c.clientId === id).map((c) => c.id).pop()", cl["id"])
+    assert case and t == f"Opened {case}, the 2026 ITR12 case for Bheki Nxumalo.", t
+    assert f.case(case, "[c.year, c.consultant, ENGINE.currentGate(c)]") == [2026, "TC1", "G01"]
+    assert any(f"Opened the 2026 ITR12 case {case}" in a["text"] for a in f.audit_since(n1))
+    assert case in f.text("[data-rv-key='adm-client-cases']")
+    assert f.page.locator(f"button[data-act='adm.newCase'][data-client='{cl['id']}']").count() == 0  # one case per tax year
 
     # Onboarding: the Administrator marks each KYC document received on the client page, then releases G01.
-    for key in ["id", "address", "bank", "mandate", "popia", "engagement"]:
+    for key in f.js("id => ENGINE.clientOf(id).kyc.map((k) => k.key)", cl["id"]):
         t = f.act(f"[data-rv-key='adm-client-kyc'] button[data-act='adm.kyc'][data-key='{key}'][data-ok='1']")
         assert t.startswith("Marked as received:"), t
     assert f.js("id => ENGINE.clientOf(id).kyc.every((k) => k.ok)", cl["id"])
     f.release(case, "G01", where="[data-rv-key='adm-client-kyc']")
     assert f.case(case, "c.gates.G01.by") == ["AD1"]
 
-    # G02: the Tax Consultant. The comparison checklist item has no screen.
+    # G02: the Tax Consultant ticks the comparison with the SARS registered details on the case page, then releases G02.
     f.as_role(TC)
     f.open_link(f"#case-{case}")
-    assert "SARS registered details compared" in f.case(case, "ENGINE.canRelease(c, 'G02', ACTOR.me()).why")
-    f.bridge(D_G02_COMPARE, "id => ENGINE.markReq(ENGINE.caseById(id), 'G02', 'compare', ACTOR.ai())", case)
-    f.open_link(f"#case-{case}")
+    if not f.case(case, "c.req.G02.every((r) => r.done)"):
+        assert "SARS registered details compared" in f.case(case, "ENGINE.canRelease(c, 'G02', ACTOR.me()).why")
+        f.tick(case, "G02")
     f.release(case, "G02")
 
     # G03 and G04 in the client's PaperSync portal: the questionnaire, then the documents (one picked file, one sample file).
     f.portal(case)
-    for key, yes in [("employment", 1), ("medical", 1), ("ra", 0), ("interest", 0), ("rental", 0), ("cgt", 0), ("foreign", 0)]:
-        p.check(f"#ps-q-{key}-{yes}")
-    assert f.case(case, "Object.keys(c.questionnaire.answers).length") == 7
+    required = f.case(case, "c.questionnaire.required")
+    for key in required:
+        p.check(f"#ps-q-{key}-{1 if key in ('employment', 'medical') else 0}")
+    assert f.case(case, "Object.keys(c.questionnaire.answers).length") == len(required)
     assert f.act("button[data-act='ps.submitQ']") == "Questionnaire submitted. Your checklist is updated."
     assert f.case(case, "c.gates.G03.status + '|' + c.gates.G03.byType + '|' + c.gates.G03.via") == "released|client|portal"
     items = f.case(case, "Object.fromEntries(c.items.map((it) => [it.kind, it.id]))")
@@ -298,17 +300,23 @@ def test_new_client_from_import_to_closed_and_retained(flow):
     # G04 is the AI's gate: with both documents validated and nothing blocking, it passes by itself.
     assert f.case(case, "[c.gates.G04.status, c.gates.G04.byType]") == ["released", "ai"]
 
-    # G05: the extracted values have no screen; the calculation and the release do.
+    # G05: the Tax Consultant records the values read from each checked document on the case page, then recalculates.
     f.open_link(f"#case-{case}")
     assert "no values have been extracted" in f.text("[data-rv-key='cases-case-calc']")
     assert p.locator("[data-rv-key='cases-case-calc'] button[data-act='cases.recalc']").count() == 0
-    f.bridge(D_EXTRACT, """id => { const c = ENGINE.caseById(id); const d = (k) => c.docs.find((x) => x.kind === k && x.status === 'validated').id;
-        return ENGINE.setInputs(c, ACTOR.ai(), { lines: [
-          { id: 'L1', docId: d('irp5'), ref: 'IRP5 code 3601: income', field: 'remuneration', amount: 455000 },
-          { id: 'L2', docId: d('irp5'), ref: 'IRP5 code 4102: PAYE', field: 'paye', amount: 84300 },
-          { id: 'L3', docId: d('medical'), ref: 'Medical scheme certificate: contributions', field: 'medicalFees', amount: 31200 }],
-          medical: { months: 12, dependants: 0 } }, { note: 'Extracted the values (bridge for the missing screen)' }); }""", case)
-    f.open_link(f"#case-{case}")
+    docs = f.case(case, "Object.fromEntries(c.docs.filter((d) => d.status === 'validated').map((d) => [d.kind, d.id]))")
+    f.click(f"[data-rv-key='cases-case-documents'] button[data-act='cases.values'][data-case='{case}'][data-doc='{docs['irp5']}']")
+    t = f.dialog(select={"#cs-v-f0": "remuneration", "#cs-v-f1": "paye"},
+                 fill={"#cs-v-r0": "IRP5 code 3601: income", "#cs-v-a0": "455000", "#cs-v-r1": "IRP5 code 4102: PAYE", "#cs-v-a1": "84 300"})
+    assert t == "Recorded 2 values from the IRP5 employee tax certificate. Recalculate to use them.", t
+    f.click(f"[data-rv-key='cases-case-documents'] button[data-act='cases.values'][data-case='{case}'][data-doc='{docs['medical']}']")
+    t = f.dialog(select={"#cs-v-f0": "medicalFees"}, fill={"#cs-v-r0": "Medical scheme certificate: contributions", "#cs-v-a0": "31200", "#cs-v-months": "12", "#cs-v-deps": "0"})
+    assert t == "Recorded 1 value from the Medical scheme tax certificate. Recalculate to use them.", t
+    lines = f.case(case, "c.inputs.lines.map((l) => [l.id, l.field, l.amount, l.docId === c.docs.find((d) => d.kind === (l.field === 'medicalFees' ? 'medical' : 'irp5')).id])")
+    assert lines == [["L1", "remuneration", 455000, True], ["L2", "paye", 84300, True], ["L3", "medicalFees", 31200, True]], lines
+    assert f.case(case, "c.inputs.medical") == {"months": 12, "dependants": 0}
+    assert any(a["result"] == "Recorded" and a["who"] == "TC1" for a in f.audit_since(n1))
+    assert "IRP5 code 3601: income" in f.text("[data-rv-key='cases-case-documents']")
     f.click(f"[data-rv-key='cases-case-calc'] button[data-act='cases.recalc'][data-case='{case}']")
     assert f.dialog(fill={"#cs-rc-why": "First calculation"}) == f"Recalculated {case}: version 1."
     calc = f.case(case, "({ v: ENGINE.vN(c), ruleset: c.calc.ruleset, errors: c.calc.errors.length, pending: c.calc.pending.length, recon: c.recon.ok, ti: c.calc.summary.taxableIncome })")
@@ -349,18 +357,26 @@ def test_new_client_from_import_to_closed_and_retained(flow):
     sub = f.case(case, "({ ok: c.submission.ok, ref: c.submission.ref, from: c.retention.from, until: c.retention.until, col: ENGINE.columnOf(c) })")
     assert sub["ok"] and sub["ref"].startswith("SARS-") and sub["from"] and sub["until"] and sub["col"] == "after-filing", sub
 
-    # The ITA34 has no screen to arrive by: nothing for this case under Inbound from SARS.
+    # The simulated SARS sends the ITA34 on the SARS link (it plays SARS's part, with the firm's approved figures).
     assert f.js("id => S.inbound.filter((it) => it.caseId === id).length", case) == 0
-    f.bridge(D_ITA34, """id => { const c = ENGINE.caseById(id); ENGINE.receive({ fn: 'ita34', taxRef: ENGINE.clientOf(c).taxRef, year: c.year,
-        ref: 'ITA34-FLOW-0001', date: ENGINE.isoDay(now()), data: c.calc.summary, submissionRef: c.submission.ref }); return { ok: !!c.ita34 }; }""", case)
+    f.open_link("#sars")
+    assert "Simulate SARS sending an ITA34" in f.text("[data-rv-key='ops-sars-inbound']")
+    f.click("[data-rv-key='ops-sars-inbound'] button[data-act='ops.in.ita34']")
+    t = f.dialog(select={"#ops-ita-case": case}, radio="same")
+    ita = f.case(case, "({ ref: c.ita34.ref, date: c.ita34.date, by: S.audit.filter((a) => a.caseId === c.id && a.sarsRef === c.ita34.ref).map((a) => a.who) })")
+    assert t == f"SARS (simulated) sent ITA34 {ita['ref']} for {case}: it agrees with the approved calculation.", t
+    assert ita["date"] == f.js("ENGINE.isoDay(now())") and "SARS (simulated)" in ita["by"], ita
+    assert f.js("id => S.inbound.filter((it) => it.caseId === id && it.fn === 'ita34').length", case) == 1
+    assert ita["ref"] in f.text("[data-rv-key='ops-sars-inbound']")
     # G12 is the AI's comparison with the approved calculation: it agrees, so the gate passes by itself.
     assert f.case(case, "[c.ita34.recon.ok, c.gates.G12.status, c.gates.G12.byType]") == [True, "released", "ai"]
     f.as_role(TC)
     f.open_link(f"#case-{case}")
     assert "Agrees with the approved calculation" in f.text("[data-rv-key='cases-case-ita34']")
-    assert "Not ready: Client advised of the assessment outcome" in f.case(case, "ENGINE.canRelease(c, 'G13', ACTOR.me()).why")
-    f.bridge(D_G13_ADVICE, "id => ENGINE.markReq(ENGINE.caseById(id), 'G13', 'advice', ACTOR.me())", case)
-    f.open_link(f"#case-{case}")
+    # G13: the Tax Consultant ticks the G13 checklist on the case page, then releases it.
+    todo = f.case(case, "c.req.G13.filter((r) => !r.done).map((r) => r.label)")
+    assert todo and "Not ready: " + todo[0] in f.case(case, "ENGINE.canRelease(c, 'G13', ACTOR.me()).why")
+    f.tick(case, "G13")
     f.release(case, "G13")
 
     # G14: the client accepts the assessment in the portal.
@@ -569,13 +585,25 @@ def test_ruleset_change_on_try_it_raises_tax06_and_ai07_then_restore_and_rerun(f
     assert f.dialog(fill={"#vk-res-action": "Calculation rerun on the approved 2026.1 ruleset"}) == f"Resolved {x06} (TAX-06)."
     assert f.js("id => ENGINE.exById(id).status", x06) == "resolved"
     assert f.case(case, "ENGINE.resolveGuard(c, ENGINE.openOf(c, 'AI-07')[0])") is None
-    # After the rerun the case should be able to move on. AI-07 and TAX-06's second review belong to the platform team, which has no screen.
-    why = f.case(case, "ENGINE.canRelease(c, 'G05', ACTOR.me()).why")
-    if why:
-        f.open_link(f"#case-{case}")
-        ex = f.text("[data-rv-key='cases-case-exceptions']")
-        assert "AI-07 is resolved by the Platform Product Owner (simulated platform team)" in ex, ex
-        f.defect(D_PLATFORM + " Seen: " + why)
+    # The platform team's part is simulated on the same page: it resolves AI-07 (its owner) and closes TAX-06 (its secondary reviewer).
+    x07 = f.case(case, "ENGINE.openOf(c, 'AI-07')[0].id")
+    f.open_link(f"#case-{case}")
+    assert f.page.locator(f"[data-rv-key='cases-case-exceptions'] button[data-act='vk.resolve'][data-ex='{x07}']").count() == 0
+    f.click(f"[data-rv-key='cases-case-exceptions'] button[data-act='vk.platResolve'][data-ex='{x07}']")
+    assert "simulated" in f.text("#dlg")
+    assert f.dialog(fill={"#vk-pres-action": "Impact assessed: every affected calculation was rerun on 2026.1"}) == f"Resolved {x07} (AI-07) as the simulated Platform Product Owner."
+    f.click(f"[data-rv-key='cases-case-exceptions'] button[data-act='vk.platClose'][data-ex='{x06}']")
+    assert f.dialog(fill={"#vk-pclose-note": "Ruleset 2026.1 confirmed as the approved configuration"}) == f"Closed {x06} (TAX-06) as the simulated Platform Product Owner."
+    st = f.js("([a, b]) => [a, b].map((id) => { const x = ENGINE.exById(id); return [x.status, x.resolvedById, x.closedById || null]; })", [x07, x06])
+    assert st == [["resolved", "Platform Product Owner (simulated)", None], ["closed", "TC1", "Platform Product Owner (simulated)"]], st
+    # AI-07's secondary reviewer is the Tax Consultant, who did not resolve it, so the Tax Consultant closes it.
+    f.click(f"[data-rv-key='cases-case-exceptions'] button[data-act='vk.close'][data-ex='{x07}']")
+    assert f.dialog() == f"Closed {x07} (AI-07)."
+    assert f.js("id => [ENGINE.exById(id).status, ENGINE.exById(id).closedById]", x07) == ["closed", "TC1"]
+    # Nothing blocks the case any more: the Tax Consultant releases G05 on the case page.
+    assert f.case(case, "ENGINE.canRelease(c, 'G05', ACTOR.me()).why") == ""
+    f.release(case, "G05")
+    assert any(a["who"] == "Platform Product Owner (simulated)" and a["code"] == "AI-07" for a in f.audit_since(0))
     f.finish()
 
 
@@ -591,9 +619,10 @@ def test_client_instructs_the_firm_then_the_objection_with_its_chapter9_deadline
     assert f.dialog(fill={"#vk-res-action": "SARS used R42,000.00 for the retirement annuity; the certificate shows R60,000.00"}) == f"Resolved {x} (ASM-02)."
     if f.case(case, "c.gates.G12.status") != "released":
         f.release(case, "G12")
-    assert "Not ready: Client advised of the assessment outcome" in f.case(case, "ENGINE.canRelease(c, 'G13', ACTOR.me()).why")
-    f.bridge(D_G13_ADVICE, "id => ENGINE.markReq(ENGINE.caseById(id), 'G13', 'advice', ACTOR.me())", case)
+    todo = f.case(case, "c.req.G13.filter((r) => !r.done).map((r) => r.label)")
+    assert todo and "Not ready: " + todo[0] in f.case(case, "ENGINE.canRelease(c, 'G13', ACTOR.me()).why")
     f.open_link(f"#case-{case}")
+    f.tick(case, "G13")
     f.release(case, "G13")
     # The client disagrees in the portal and instructs the firm.
     f.portal(case)
@@ -608,11 +637,15 @@ def test_client_instructs_the_firm_then_the_objection_with_its_chapter9_deadline
     rows = f.js("id => Array.from(document.querySelectorAll(\"[data-rv-key='adm-deadlines-remedies'] tbody tr\")).map((r) => r.textContent).filter((t) => t.includes(id))", case)
     obj = [r for r in rows if "Notice of objection" in r]
     assert obj and "if the client disputes" in obj[0] and want["text"] in obj[0], rows
-    # Choosing the objection has no screen.
+    # The Tax Consultant chooses the objection on the case page, with the grounds and evidence; the dialog shows its deadline first.
     f.open_link(f"#case-{case}")
     rem = f.case(case, "ENGINE.openOf(c, 'REM-01')[0].id")
     assert "Choose the remedy route first" in f.text("[data-rv-key='cases-case-exceptions']")
-    f.bridge(D_REMEDY, "id => ENGINE.chooseRemedy(ENGINE.caseById(id), ACTOR.me(), 'objection', { evidence: 'Retirement annuity certificate for R60,000.00' })", case)
+    f.click(f"[data-rv-key='cases-case-ita34'] button[data-act='cases.remedy'][data-case='{case}']")
+    assert want["text"] in f.text("#dlg label:has(input[value='objection'])")
+    assert f.dialog(ok=False, radio="objection") == "Record the grounds and evidence."
+    t = f.dialog(radio="objection", fill={"#cs-rem-ev": "Retirement annuity certificate for R60,000.00"})
+    assert t == "Chose the remedy: Notice of objection, due " + want["text"] + ".", t
     st = f.case(case, "({ route: c.remedy.route, deadline: c.remedy.deadline, rem05: ENGINE.openOf(c, 'REM-05').map((x) => x.sarsDeadline), rem01: ENGINE.exById('" + rem + "').status })")
     assert st == {"route": "objection", "deadline": want["iso"], "rem05": [want["iso"]], "rem01": "resolved"}, st
     # The deadline shows on the case page, in the client's portal and on Deadlines; the client authorises the objection.

@@ -2,7 +2,8 @@
    and a side-by-side comparison with the SARS registered details (G02, MD-* codes).
    This file also defines ADM, the few helpers the admin screens share (views-deadlines, views-controls, views-records and
    views-import): the Phase 1 field list, downloads, outside links and the modal result helper.
-   Views only read state: a KYC change goes through ENGINE.setKyc with ACTOR.me(), and ENGINE audits every refusal. */
+   Views only read state: a KYC change goes through ENGINE.setKyc with ACTOR.me(), and opening the year's ITR12 case through
+   ENGINE.newCase (an Administrator or a Tax Consultant); ENGINE audits every refusal. */
 const ADM = (() => {
   /* ---------- The Phase 1 field groups, as the master document lists them (Phase 1, step 1) ---------- */
   const P1 = ((WORKFLOW.phases.find((p) => p.n === 1) || { steps: [] }).steps[0]) || { groups: [], responsible: '', reviewer: '' };
@@ -25,6 +26,7 @@ const ADM = (() => {
     F('passport_country', 'Passport country', 0),
     F('passport_issue_date', 'Passport issue date', 0, { kind: 'date', hint: 'YYYY-MM-DD' }),
     F('nationality', 'Nationality or citizenship', 0),
+    F('foreign_tax_info', 'Relevant foreign tax information', 0, { hint: 'For a client with no RSA ID number' }),
     F('email', 'Email address', 1, { kind: 'email' }),
     F('mobile', 'Cell or mobile number', 1, { kind: 'phone', hint: 'For example 082 123 4567 or +27 82 123 4567' }),
     F('home_phone', 'Home telephone', 1, { kind: 'phone' }),
@@ -50,10 +52,12 @@ const ADM = (() => {
     F('foreign_tin', 'Foreign tax identification number', 4, { mask: 'tail' }),
     F('account_holder', 'Account-holder legal name', 5),
     F('bank', 'Bank', 5),
+    F('branch', 'Branch', 5),
     F('branch_code', 'Branch code', 5, { kind: 'branch', hint: '6 digits' }),
     F('account_number', 'Account number', 5, { kind: 'account', mask: 'tail' }),
     F('account_type', 'Account type', 5),
     F('held_by_taxpayer', 'Account held by the taxpayer', 5, { kind: 'yesno' }),
+    F('details_agree_sars', 'Details agree with SARS', 5, { kind: 'yesno', hint: 'Whether these details agree with what SARS holds' }),
     F('provisional', 'Provisional taxpayer', 6, { kind: 'yesno', hint: 'Sets the filing-season deadline; not a Phase 1 item' }),
   ];
   const GROUP_LABEL = (g) => (GROUPS[g] ? GROUPS[g].title : 'Added by the preview');
@@ -267,6 +271,13 @@ const ADM = (() => {
       intro: esc('Side by side: what the client record holds and what the simulated SARS link returned. The comparison items are the ones Phase 3 lists. A difference is an MD code that the Tax Consultant clears before G02 can pass.'),
     });
   }
+  // Opening the year's ITR12 case: an Administrator or a Tax Consultant, once per client and tax year.
+  const OPENERS = ['Administrator', 'Tax Consultant'];
+  function openCaseBtn(cl) {
+    const year = FILING_2026.year;
+    if (caseOfClient(cl).some((c) => c.year === year)) return '';
+    return btn('Open the ' + year + ' ITR12 case', 'adm.newCase', { cls: 'sm primary', data: { client: cl.id }, lock: OPENERS.includes(S.role) ? null : 'Administrator or Tax Consultant only' });
+  }
   function casesBlock(cl) {
     const rows = caseOfClient(cl).map((c) => {
       const col = BOARD.find((b) => b.key === ENGINE.columnOf(c)); const g = ENGINE.currentGate(c);
@@ -274,8 +285,10 @@ const ADM = (() => {
       return [VK.caseLink(c), esc(c.year), esc(col ? col.label : ''), g ? VK.gateChip(c, g) : VK.pill('All gates passed', 'ok'),
         open.length ? `<div class="vk-codes">${open.map((x) => VK.codeChip(x.code, x)).join(' ')}</div>` : '<span class="muted">None</span>'];
     });
+    const open = openCaseBtn(cl);
     return VK.section('adm-client-cases', 'Annual ITR12 cases', VK.table([{ label: 'Case' }, { label: 'Year' }, { label: 'Stage' }, { label: 'Current gate' }, { label: 'Open exceptions' }], rows,
-      { caption: 'ITR12 cases for ' + cl.name, empty: 'No ITR12 case yet.' }), { count: rows.length, intro: esc('Each tax year is a separate case in the annual case repository.') });
+      { caption: 'ITR12 cases for ' + cl.name, empty: 'No ITR12 case yet.' }) + (open ? `<div class="adm-gateline"><span class="small muted">${esc('The ' + FILING_2026.year + ' year of assessment (' + FILING_2026.period + ') has no case yet.')}</span>${open}</div>` : ''),
+    { count: rows.length, intro: esc('Each tax year is a separate case in the annual case repository. An Administrator or a Tax Consultant opens it; G01 then waits for the KYC documents.') });
   }
   function activityBlock(cl) {
     const items = S.audit.filter((a) => a.client === cl.id || a.who === cl.id).slice(-12).reverse().map(ADM.auditRow);
@@ -292,6 +305,24 @@ const ADM = (() => {
 
   /* ---------- Actions ---------- */
   Object.assign(ACT, {
+    'adm.newCase': (t) => {
+      const cl = ENGINE.clientOf(t.dataset.client); if (!cl) { toast('That client is no longer here.'); render(); return; }
+      const year = FILING_2026.year;
+      if (caseOfClient(cl).some((c) => c.year === year)) { toast('Not done: ' + cl.name + ' already has a ' + year + ' ITR12 case.'); render(); return; }
+      const tcs = S.people.filter((p) => p.role === 'Tax Consultant');
+      const mine = S.role === 'Tax Consultant' ? me().id : (tcs[0] ? tcs[0].id : 'TC1');
+      modal('Open the ' + year + ' ITR12 case', `${VK.facts([['Client', esc(cl.id + ' · ' + cl.name)], ['Year of assessment', esc(year + ' (' + FILING_2026.period + ')')], ['Filing', esc(cl.provisional ? 'Provisional taxpayer' : 'Not a provisional taxpayer')]])}
+        <label class="f" for="adm-nc-tc">Tax Consultant<select id="adm-nc-tc" name="consultant">${tcs.map((p) => `<option value="${esc(p.id)}"${p.id === mine ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        <p class="hint">${esc('You open it as ' + S.role + ' (' + me().name + '). The case starts at G01 (the KYC documents), then the SARS details check (G02) and the client’s questionnaire in the PaperSync portal (simulated). Operon records it in the audit trail.')}</p>`,
+      'Open the case', (fd) => {
+        if (!OPENERS.includes(S.role)) return 'Not done: only an Administrator or a Tax Consultant opens a case.';
+        if (caseOfClient(cl).some((c) => c.year === year)) return 'Not done: ' + cl.name + ' already has a ' + year + ' ITR12 case.';
+        const consultant = tcs.some((p) => p.id === fd.consultant) ? String(fd.consultant) : mine;
+        const c = ENGINE.newCase(cl, { year, consultant }, ACTOR.me());
+        if (!c || c.ok === false || !c.id) return 'Not done: ' + ((c && c.why) || 'Operon refused this.');
+        return () => VK.done({ ok: true }, 'Opened ' + c.id + ', the ' + year + ' ITR12 case for ' + cl.name + '.');
+      });
+    },
     'adm.kyc': (t) => {
       const cl = ENGINE.clientOf(t.dataset.client); if (!cl) { toast('That client is no longer here.'); render(); return; }
       const k = cl.kyc.find((x) => x.key === t.dataset.key); if (!k) return;

@@ -75,17 +75,21 @@
     const to = BOARD[i + 1] ? BOARD[i + 1] : null;
     const n0 = S.audit.length;
     const r = ENGINE.dragForward(c, ACTOR.me(), to ? to.key : null);
+    // A role that does not own the gate is refused for that reason alone, which hides the codes this scenario is about. So the
+    // simulated Tax Consultant, who owns G02, tries the same drag too: that refusal names the blocking codes.
+    const tcToo = !r.ok && S.role !== 'Tax Consultant' ? ENGINE.dragForward(c, ACTOR.as('Tax Consultant', c.consultant), to ? to.key : null) : null;
     const logged = S.audit.slice(n0).filter((a) => a.result === 'Refused').length;
-    const bl = (r.blockers || []).filter((x) => x && x.code);
+    const bl = ((r.blockers && r.blockers.length ? r.blockers : (tcToo && tcToo.blockers) || [])).filter((x) => x && x.code);
     const fromL = (BOARD[i] || {}).label || from;
-    if (r.ok) {
-      return { tone: 'ok', head: 'It moved: nothing blocked ' + c.id + ' any more.', lines: [`You (${esc(you())}) dragged ${VK.caseWho(c)} from ${esc(fromL)} towards ${esc(to ? to.label : 'the next column')}. Every check passed, so Operon released the gate and recorded it.`], links: [VK.caseLink(c), go('cases', 'Cases board'), go('audit', 'Audit trail')] };
+    if (r.ok || (tcToo && tcToo.ok)) {
+      return { tone: 'ok', head: 'It moved: nothing blocked ' + c.id + ' any more.', lines: [`${r.ok ? 'You (' + esc(you()) + ')' : 'The Tax Consultant (simulated)'} dragged ${VK.caseWho(c)} from ${esc(fromL)} towards ${esc(to ? to.label : 'the next column')}. Every check passed, so Operon released the gate and recorded it.`], links: [VK.caseLink(c), go('cases', 'Cases board'), go('audit', 'Audit trail')] };
     }
     return {
-      tone: 'stop', head: 'Refused: ' + r.why,
+      tone: 'stop', head: 'Refused: ' + (tcToo ? tcToo.why : r.why),
       lines: [`You (${esc(you())}) dragged ${VK.caseWho(c)} from ${esc(fromL)} to ${esc(to ? to.label : 'the next column')} on the Cases board. A forward drag is a request to release the gate.`,
-        `Operon refused it and the card snapped back: ${esc(r.why)}${bl.length ? ' ' + chips(bl) : ''}`,
-        esc(plural(logged, 'refusal') + ' written to the audit trail. Nothing changed on the case.')],
+        `Operon refused it and the card snapped back: ${esc(r.why)}${!tcToo && bl.length ? ' ' + chips(bl) : ''}`,
+        tcToo ? `The Tax Consultant (simulated), who owns G02, tried the same drag. Refused: ${esc(tcToo.why)}${bl.length ? ' ' + chips(bl) : ''}` : '',
+        esc(plural(logged, 'refusal') + ' written to the audit trail. Nothing changed on the case.')].filter(Boolean),
       links: [VK.caseLink(c, 'Case ' + c.id), go('cases', 'Cases board')].concat(bl.slice(0, 2).map((x) => VK.exLink(x, x.code + ' ' + x.id)), [go('audit', 'Audit trail')]),
     };
   }
@@ -166,7 +170,7 @@
       lines: ['The platform team (simulated) restored ruleset 2026.1. Each case with a calculation keeps or gets AI-07 as an impact check until it is rerun.',
         out.length ? 'The AI (simulated) reran each affected calculation:' : 'No case needed a rerun.',
         ...out.map((o) => `${VK.caseWho(o.c)}: ${o.k.ok ? esc('version ' + o.k.version + ' on 2026.1') + (ENGINE.currentApproval(o.c) ? '' : esc(o.c.approval ? ', so the client must approve again' : '')) : 'refused: ' + esc(o.k.why)}`),
-        esc(plural(open.length, 'AI-07 or TAX-06 exception') + ' stay open until their owners resolve them on Exceptions; where the rerun worked, their checks now pass.')],
+        esc(plural(open.length, 'AI-07 or TAX-06 exception') + ' stay open until their owners resolve them on each case or exception page; where the rerun worked, their checks now pass. The Tax Consultant resolves TAX-06 first. The platform team’s part (resolving AI-07, closing TAX-06) is simulated: its buttons say “as the simulated platform team”.')],
       links: [go('exceptions', 'Exceptions'), go('cases', 'Cases board'), go('audit', 'Audit trail')],
     };
   }

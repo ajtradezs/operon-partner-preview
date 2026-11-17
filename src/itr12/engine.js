@@ -3,7 +3,8 @@
    change is written to the hash-chained audit trail. The AI checks and the SARS link are simulated and labelled as such.
 
    Actors: ACTOR.me(), as(role, personId), client(clientId), ai(), reviewer(), system(), platform(role), sars().
-   Actions return { ok, why, ... } and audit every refusal. The main ones:
+   Actions return { ok, why, ... } and audit every authorisation and gate refusal; malformed input (an unknown key or code, a bad
+   date format) and no-ops return fail() without an audit entry. The main ones:
      newClient(o) newCase(client, o) addItem(c, kind, label) setKyc(client, key, ok, a) markReq(c, gate, key, a)
      release(c, gate, a, o) canRelease(c, gate, a, o) gateState(c, gate) drive(c, untilGate, o)
      raise(c, code, o) raiseManual(c, code, a, o) resolve(x, a, o) close(x, a, o) setSeverity(x, a, to, o) approveSeverity(x, a, o)
@@ -74,6 +75,11 @@ const ENGINE = (() => {
   const itr12InFlight = (c) => S.txs.find((t) => t.caseId === c.id && t.fn === 'itr12' && IN_FLIGHT.includes(t.status)) || null;
   const currentApproval = (c) => !!(c.approval && !c.approval.withdrawn && !c.approval.superseded);
   const validDay = (s) => (typeof s === 'string' && DATES.dt(s) ? s : null);
+  // A YYYY-MM-DD day as people read it ('12 Nov 2026'), for audit texts.
+  const dayText = (s) => { const d = validDay(s) && DATES.dt(s); return d ? fDate(DATES.toLocal(d)) : String(s); };
+  // Money as the rest of the app shows it (calc.js), e.g. '−R97,155.00'.
+  const money = (n) => (typeof CALC !== 'undefined' ? CALC.rand(n) : R(n));
+  const colLabel = (k) => { const col = BOARD.find((x) => x.key === k); return col ? col.label : k; };
 
   /* ===================== Audit ===================== */
   // Client and simulated platform actions are human actions; SARS events are recorded as system events.
@@ -135,21 +141,30 @@ const ENGINE = (() => {
     { key: 'travel', label: 'Did you receive a travel allowance?', kind: 'logbook' },
     { key: 'homeoffice', label: 'Did you work from a home office?', kind: 'homeoffice' },
     { key: 'donations', label: 'Did you make section 18A donations?', kind: 'donation' },
+    // The other step 5 areas. The new ones that change the shape of the return are material: new this year, they raise QUE-03.
+    { key: 'pension', label: 'Did you receive a pension or annuity?', kind: 'pension', material: true },
+    { key: 'business', label: 'Did you run a trade or business, or work for yourself?', kind: 'business', material: true },
+    { key: 'trust', label: 'Did you receive a distribution from a trust?', kind: 'trust', material: true },
+    { key: 'disability', label: 'Do you, your spouse or a dependant have a disability?', kind: 'disability' },
+    { key: 'other', label: 'Any other income or deductions, or any material change since last year?', material: true },
   ];
   const kindLabel = (k) => { const d = DOC_KINDS.find((x) => x.kind === k); return d ? d.label : k; };
   // A clean file name per document kind (used by drive() and the demo's "upload a sample" buttons).
   const FILE_FOR = { irp5: 'IRP5_2026.pdf', it3b: 'IT3b_interest_2026.pdf', it3c: 'IT3c_capital_gains_2026.pdf', medical: 'Medical_scheme_certificate_2026.pdf',
     ra: 'RA_certificate_2026.pdf', rental: 'Rental_schedule_2026.pdf', logbook: 'Logbook_2026.pdf', homeoffice: 'Home_office_expenses_2026.pdf',
-    donation: 'Section18A_receipt_2026.pdf', foreign: 'Foreign_income_statement_2026.pdf', bank: 'Bank_confirmation_2026.pdf', notice: 'SARS_notice_2026.pdf' };
+    donation: 'Section18A_receipt_2026.pdf', foreign: 'Foreign_income_statement_2026.pdf', bank: 'Bank_confirmation_2026.pdf', notice: 'SARS_notice_2026.pdf',
+    business: 'Business_income_and_expenses_2026.pdf', trust: 'Trust_distribution_2026.pdf', pension: 'Pension_certificate_2026.pdf', disability: 'ITR-DD_disability_2026.pdf' };
 
   // a: the person adding the client (an Administrator). The seed and the engine's own walk-through pass none (the system).
   function newClient(o, a) {
     o = o || {};
     if (a) { const w = staffWhy(a, 'Administrator'); if (w) return refuse(a, null, 'Adding a client refused', w); }
     const kyc = KYC_ITEMS.map((k) => ({ key: k.key, label: k.label, ok: o.kyc && k.key in o.kyc ? !!o.kyc[k.key] : true }));
-    // The default ID number deliberately fails the SA ID checksum: every identity in the preview is made up.
-    const cl = { id: nextId('clientN', 'CL', 2), name: o.name || 'Demo Client', idNo: o.idNo || '8001015009088', taxRef: o.taxRef || '0123456789',
+    // The default ID number deliberately fails the SA ID checksum: every identity in the preview is made up. It is used only when
+    // no idNo is given at all; idNo: null (or '') is a client without an RSA ID (passport only), and calc.js then asks for the date of birth.
+    const cl = { id: nextId('clientN', 'CL', 2), name: o.name || 'Demo Client', idNo: o.idNo === undefined ? '8001015009088' : (o.idNo || null), taxRef: o.taxRef || '0123456789',
       provisional: o.provisional !== false, others: (o.others || []).slice(), kyc, email: o.email || null };
+    if (o.dob) cl.dob = String(o.dob);
     if (o.master && typeof o.master === 'object') cl.master = Object.assign({}, o.master);
     S.clients.push(cl);
     log(a || ACTOR.system(), 'Added client ' + cl.id + ' to the permanent client repository', { client: cl.id });
@@ -351,7 +366,7 @@ const ENGINE = (() => {
     }
     const st = c.gates[g]; const before = st.status;
     Object.assign(st, { status: 'released', by: [whoOf(a)], byType: a.type, at: now(), version: vN(c), rework: null, routed: false, via: a.via || null });
-    log(a, 'Released ' + g + ': ' + GATE[g].control, Object.assign(cf(c), { gate: g, before, after: 'released', result: 'Released', evidence: o.evidence || '' }));
+    log(a, 'Released ' + g + ': ' + GATE[g].control, Object.assign(cf(c), { gate: g, before, after: 'released', result: 'Released', evidence: o.evidence || '' }, o.sarsRef ? { sarsRef: o.sarsRef } : {}));
     onReleased(c, g, a);
     settle(c);
     return r;
@@ -361,6 +376,12 @@ const ENGINE = (() => {
     else if (g === 'G09') { const t = newTx(c, 'itr12', a); c.subTx = t.id; }
     else if (g === 'G10') { if (daMoved(c)) log(ACTOR.system(), 'G10 passed without a response: SARS moved the Declaration Questionnaire to verification', Object.assign(cf(c), { gate: 'G10' })); else newTx(c, 'da', a); }
     else if (g === 'G11') newTx(c, 'vrf', a);
+    else if (g === 'G13') {
+      // The G13 box, on pass: "Release assessment package to client". Only now is the client told (step 24).
+      c.assessmentPack = { at: now(), ita34: c.ita34 ? { ref: c.ita34.ref, date: c.ita34.date } : null };
+      log(ACTOR.system(), 'Released the assessment package to the client in the PaperSync portal (simulated)' + (c.ita34 ? ': ITA34 ' + c.ita34.ref + ' dated ' + dayText(c.ita34.date) : ''),
+        Object.assign(cf(c), { gate: 'G13', sarsRef: c.ita34 ? c.ita34.ref : null, result: 'Sent' }));
+    }
     else if (g === 'G15' && c.remedy.route !== 'advice') {
       const f = SARS_FN[c.remedy.route];
       const t = newTx(c, c.remedy.route, a, { status: f.approved ? 'awaiting G18' : 'blocked' });
@@ -657,11 +678,13 @@ const ENGINE = (() => {
     log(ACTOR.system(), 'Validated ' + d.name + ' after its exceptions were cleared', Object.assign(cf(c), { doc: d.id }));
   }
 
-  /* ---------- Severity: staff, the AI and the system may raise it; only a person may lower it; lowering S1/S2 needs the Records/Compliance Owner ---------- */
+  /* ---------- Severity: staff, the AI and the system may raise it; only a person may lower it. Lowering S1/S2, or any code the
+     register marks blocking, needs the Records/Compliance Owner; only the code's owner may ask to lower a blocking code.
+     The register rules: Severity and Blocking are separate columns, so a severity change never changes x.blocking. ---------- */
+  const lowerNeedsApproval = (x) => x.sev === 'S1' || x.sev === 'S2' || CODE[x.code].blocking !== 'No';
   function applySeverity(x, to, a, note, viaRequest) {
-    const c = caseOf(x); const from = x.sev; const def = CODE[x.code];
+    const c = caseOf(x); const from = x.sev;
     x.sev = to; x.severity = SEV_LABEL[to]; x.humanApproval = to === 'S1' || to === 'S2';
-    if (to === 'S4') x.blocking = 'No'; else if (from === 'S4') x.blocking = def.blocking === 'No' ? 'Yes' : def.blocking;
     // A pending lowering request was for the old severity; it lapses when the severity moves another way.
     if (!viaRequest && x.sevRequest && x.sevRequest.status === 'pending') {
       x.sevRequest.status = 'lapsed'; x.sevRequest.lapsedAt = now();
@@ -682,7 +705,9 @@ const ENGINE = (() => {
     if (raising) { applySeverity(x, to, a, o.reason); return okr(); }
     if (a.type !== 'human') return refuse(a, c, 'Lowering ' + x.id + ' refused', 'Only a person may lower a severity; the AI may only raise it', audit);
     const reason = String(o.reason || '').trim(); if (!reason) return refuse(a, c, 'Lowering ' + x.id + ' refused', 'Give the reason for lowering the severity', audit);
-    if (x.sev === 'S1' || x.sev === 'S2') {
+    const regBlocking = CODE[x.code].blocking !== 'No';
+    if (regBlocking && a.role !== x.owner) return refuse(a, c, 'Lowering ' + x.id + ' refused', 'The register marks ' + x.code + ' blocking, so only its owner (' + x.owner + ') may ask to lower its severity', audit);
+    if (lowerNeedsApproval(x)) {
       x.sevRequest = { from: x.sev, to, by: a.id, role: a.role, reason, at: now(), status: 'pending' };
       log(a, 'Asked to lower ' + x.id + ' (' + x.code + ') from ' + x.sev + ' to ' + to + ': ' + reason + '. Needs the Records/Compliance Owner’s approval.',
         Object.assign(cf(c), audit, { before: x.sev, after: to, reason, result: 'Requested' }));
@@ -712,6 +737,8 @@ const ENGINE = (() => {
     if (!d) return 'Unknown code ' + code;
     if (NEVER_OVERRIDE.authority.includes(code)) return 'No override may bypass missing taxpayer authority (' + code + ')';
     if (NEVER_OVERRIDE.security.includes(code)) return 'No override may bypass a security control (' + code + ')';
+    if (NEVER_OVERRIDE.statutory.includes(code)) return 'No override may bypass a statutory restriction (' + code + ')';
+    if (NEVER_OVERRIDE.sarsInterface.includes(code)) return 'No override may bypass SARS-interface authorisation (' + code + ')';
     const fam = code.split('-')[0];
     if (NEVER_OVERRIDE.families[fam]) return 'No override may bypass ' + NEVER_OVERRIDE.families[fam] + ' (' + code + ')';
     if (d.sev !== 'S2') return 'Only S2 codes can be put on the override list';
@@ -1131,8 +1158,10 @@ const ENGINE = (() => {
     const vals = it.data || {}; const calc = (c.calc && c.calc.summary) || {}; const m = S.policy.materiality.amount;
     const diffs = ITA34_FIELDS.filter((f) => Math.abs((+vals[f.key] || 0) - (+calc[f.key] || 0)) > m).map((f) => ({ key: f.key, label: f.label, firm: +calc[f.key] || 0, sars: +vals[f.key] || 0 }));
     c.ita34 = { ref: it.ref, date: it.date, values: vals, recon: { ok: !diffs.length, diffs } };
-    c.req.G13 = [{ key: 'advice', label: 'Client advised of the assessment outcome', done: false }];
-    if (diffs.length) raise(c, 'ASM-02', { by: ACTOR.ai(), note: diffs.map((d) => d.label + ': firm ' + R(d.firm) + ', SARS ' + R(d.sars)).join('; '), noSettle: true });
+    // G13 is the consultant's approval of the assessment reconciliation and of what the client will be told (step 23); the client
+    // gets the assessment package only after G13 passes (step 24). The key stays 'advice' so existing callers keep working.
+    c.req.G13 = [{ key: 'advice', label: 'Assessment reconciliation and client communication approved', detail: 'Reviewed: ' + STEP[23].items.join('; '), done: false }];
+    if (diffs.length) raise(c, 'ASM-02', { by: ACTOR.ai(), note: diffs.map((d) => d.label + ': firm ' + money(d.firm) + ', SARS ' + money(d.sars)).join('; '), noSettle: true });
   }
   function receive(o) {
     const f = SARS_FN[o.fn]; if (!f || f.dir !== 'in') throw new Error('Unknown inbound SARS item ' + o.fn);
@@ -1209,7 +1238,7 @@ const ENGINE = (() => {
   /* ===================== Documents and the simulated AI file checks (name and size only) ===================== */
   function upload(c, itemId, file, a) {
     const it = c.items.find((x) => x.id === itemId); if (!it) return fail('No checklist item ' + itemId);
-    if (a.type === 'client') { if (a.id !== c.clientId || a.via !== 'portal') return fail('Not this client'); }
+    if (a.type === 'client') { if (a.id !== c.clientId || a.via !== 'portal') return refuse(a, c, 'Upload refused', 'Not this client', { doc: it.id }); }
     else { const w = staffWhy(a, ['Administrator', 'Tax Consultant']); if (w) return refuse(a, c, 'Upload refused', w); }
     const d = { id: nextId('docN', 'D', 3), itemId, name: String(file.name), size: +file.size || 0, at: now(), by: a.type === 'client' ? c.clientId : a.id, hash: null, status: 'validated', kind: null, confidence: null };
     d.hash = digest({ name: d.name, size: d.size, at: d.at, caseId: c.id });
@@ -1316,12 +1345,20 @@ const ENGINE = (() => {
           return refuse(a, c, 'Questionnaire not submitted', missing.length + ' required question' + (missing.length === 1 ? ' is' : 's are') + ' unanswered');
         }
         if (q.status !== 'submitted') {
-          q.status = 'submitted'; q.at = now();
+          q.status = 'submitted'; q.at = now(); q.sent = Object.assign({}, q.answers);
           log(a, 'Submitted the questionnaire', Object.assign(cf(c), { result: 'Submitted' }));
           openOf(c, 'QUE-01').forEach((x) => finishResolve(x, a, 'All mandatory responses completed and saved', null));
           QUESTIONS.forEach((qq) => { if (q.answers[qq.key] && qq.kind && !c.items.some((it) => it.kind === qq.kind)) addItem(c, qq.kind); });
           c.priorYear.filter((k) => q.answers[k] === false).forEach((k) => raise(c, 'QUE-04', { by: ACTOR.ai(), item: k, note: (QUESTIONS.find((x) => x.key === k) || { label: k }).label + ' Yes last year, no this year', noSettle: true }));
           QUESTIONS.filter((qq) => qq.material && q.answers[qq.key] === true && !c.priorYear.includes(qq.key)).forEach((qq) => raise(c, 'QUE-03', { by: ACTOR.ai(), item: qq.key, note: 'New this year: ' + qq.label, noSettle: true }));
+        } else if (q.sent) {
+          // A resend after G03 was held: only answers that changed since the last send add checklist items or raise QUE-04/QUE-03,
+          // so codes the consultant already resolved are not raised again.
+          const changed = QUESTIONS.filter((qq) => qq.key in q.answers && q.answers[qq.key] !== q.sent[qq.key]);
+          changed.forEach((qq) => { if (q.answers[qq.key] && qq.kind && !c.items.some((it) => it.kind === qq.kind)) addItem(c, qq.kind); });
+          changed.filter((qq) => c.priorYear.includes(qq.key) && q.answers[qq.key] === false).forEach((qq) => raise(c, 'QUE-04', { by: ACTOR.ai(), item: qq.key, note: qq.label + ' Yes last year, no this year', noSettle: true }));
+          changed.filter((qq) => qq.material && q.answers[qq.key] === true && !c.priorYear.includes(qq.key)).forEach((qq) => raise(c, 'QUE-03', { by: ACTOR.ai(), item: qq.key, note: 'New this year: ' + qq.label, noSettle: true }));
+          q.sent = Object.assign({}, q.answers);
         }
         return release(c, 'G03', a);
       }
@@ -1387,8 +1424,10 @@ const ENGINE = (() => {
         if (d.choice !== 'accept' && d.choice !== 'instruct') return fail('Accept the assessment or instruct the firm');
         if (c.gates.G14.status === 'released') return fail('The decision is already recorded');
         const prev = c.decision;
-        c.decision = { choice: d.choice, at: now(), note: String(d.note || '') };
-        const r = release(c, 'G14', a);
+        // The G14 box: the instruction is captured with its timestamp and the assessment it answers.
+        const ita = c.ita34 ? { ref: c.ita34.ref, date: c.ita34.date } : null;
+        c.decision = { choice: d.choice, at: now(), note: String(d.note || ''), ita34: ita };
+        const r = release(c, 'G14', a, ita ? { evidence: (d.choice === 'accept' ? 'Accepted' : 'Instructed the firm on') + ' ITA34 ' + ita.ref + ' dated ' + dayText(ita.date), sarsRef: ita.ref } : {});
         if (!r.ok) { c.decision = prev; return r; }
         if (d.choice === 'instruct') {
           raise(c, 'CLT-07', { by: a, fromGate: 'G14', note: d.note || 'The client does not accept the assessment', noSettle: true });
@@ -1530,7 +1569,7 @@ const ENGINE = (() => {
     const left = DATES.businessDaysBetween(DATES.fromLocal(now()), DATES.dt(due), { ch9: !!ch9 });
     if (left > S.policy.warnDays) return false;
     c.warned[key] = true;
-    raise(c, code, { by: ACTOR.system(), sarsDeadline: due, note: left < 0 ? 'The deadline ' + due + ' has passed' : left + ' business day' + (left === 1 ? '' : 's') + ' left to ' + due });
+    raise(c, code, { by: ACTOR.system(), sarsDeadline: due, note: left < 0 ? 'The deadline ' + dayText(due) + ' has passed' : left + ' business day' + (left === 1 ? '' : 's') + ' left to ' + dayText(due) });
     return true;
   }
   function watchCase(c) {
@@ -1555,7 +1594,7 @@ const ENGINE = (() => {
     if (c.submission && c.submission.ok && !ret.from && !ret.raised.meta) { ret.raised.meta = true; raise(c, 'RET-05', { by: ACTOR.system(), note: 'Submitted, but no retention start date is recorded' }); changed = true; }
     if (ret.review && isoDay(now()) >= ret.review) {
       let hit = false;
-      if (!ret.raised.review) { ret.raised.review = true; raise(c, 'RET-03', { by: ACTOR.system(), note: 'Retention review date ' + ret.review + ' reached. Nothing is deleted automatically.', noSettle: true }); hit = true; }
+      if (!ret.raised.review) { ret.raised.review = true; raise(c, 'RET-03', { by: ACTOR.system(), note: 'Retention review date ' + dayText(ret.review) + ' reached. Nothing is deleted automatically.', noSettle: true }); hit = true; }
       ret.holds.filter((h) => !h.released && !exOf(c).some((x) => x.holdId === h.id && x.status !== 'closed')).forEach((h) => {
         raise(c, h.kind === 'dispute' ? 'RET-02' : (h.kind === 'legal' ? 'RET-04' : 'RET-01'), { by: ACTOR.system(), holdId: h.id, note: h.label + ' is still active at the review date', noSettle: true });
         hit = true;
@@ -1598,16 +1637,16 @@ const ENGINE = (() => {
       if (c.gates[g].status === 'released') return refuse(a, c, 'Move of ' + c.id + ' refused', g + ' is released; the card moves when SARS confirms its transaction (G18 on the SARS link)', { gate: g });
       if (g === 'G07') { const r7 = canRelease(c, 'G07', ACTOR.system()); return refuse(a, c, 'Move of ' + c.id + ' refused', 'G07 is Operon’s own freeze: ' + (r7.why || 'waiting'), { gate: g, code: list(r7.codes) || null }, { codes: r7.codes }); }
       const r = release(c, g, a);
-      if (!r.ok) { log(a, 'Move of ' + c.id + ' snapped back to ' + from, Object.assign(cf(c), { gate: g, code: list(r.codes) || null, result: 'Refused', reason: r.why })); return fail(r.why, { codes: r.codes, blockers: r.blockers, from, to: from }); }
+      if (!r.ok) { log(a, 'Move of ' + c.id + ' snapped back to ' + colLabel(from), Object.assign(cf(c), { gate: g, code: list(r.codes) || null, result: 'Refused', reason: r.why })); return fail(r.why, { codes: r.codes, blockers: r.blockers, from, to: from }); }
       if (!stepDone(c, g)) {
-        log(a, g + ' released by drag; ' + c.id + ' stays in ' + from + ' until SARS confirms the transaction (G18 on the SARS link)', Object.assign(cf(c), { gate: g, result: 'Released' }));
+        log(a, g + ' released by drag; ' + c.id + ' stays in ' + colLabel(from) + ' until SARS confirms the transaction (G18 on the SARS link)', Object.assign(cf(c), { gate: g, result: 'Released' }));
         return okr({ from, to: columnOf(c), awaiting: 'G18' });
       }
       if (columnOf(c) !== from) break;
     }
     const to = columnOf(c);
-    if (to === from) return refuse(a, c, 'Move of ' + c.id + ' refused', 'Nothing left to release in ' + from, audit);
-    log(a, 'Moved ' + c.id + ' from ' + from + ' to ' + to, Object.assign(cf(c), { before: from, after: to, result: 'Moved' }));
+    if (to === from) return refuse(a, c, 'Move of ' + c.id + ' refused', 'Nothing left to release in ' + colLabel(from), audit);
+    log(a, 'Moved ' + c.id + ' from ' + colLabel(from) + ' to ' + colLabel(to), Object.assign(cf(c), { before: from, after: to, result: 'Moved' }));
     return okr({ from, to });
   }
   // Dragging backward is "return for rework": a reason, backward only, before submission only. It re-opens from the target column's first
@@ -1625,7 +1664,7 @@ const ENGINE = (() => {
     if (supersede) c.approval.superseded = true;
     reopenFrom(c, supersede && SEQ.indexOf(g0) > SEQ.indexOf('G06') ? 'G06' : g0, a, 'Returned for rework: ' + reason);
     c.gates[g0].rework = { by: a.id, at: now(), reason };
-    log(a, 'Returned ' + c.id + ' from ' + from + ' to ' + toKey + ' for rework: ' + reason, Object.assign(cf(c), { before: from, after: toKey, reason, gate: g0, result: 'Rework' }));
+    log(a, 'Returned ' + c.id + ' from ' + colLabel(from) + ' to ' + colLabel(toKey) + ' for rework: ' + reason, Object.assign(cf(c), { before: from, after: toKey, reason, gate: g0, result: 'Rework' }));
     settle(c);
     return okr({ from, to: columnOf(c) });
   }

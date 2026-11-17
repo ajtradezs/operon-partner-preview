@@ -3,12 +3,16 @@
    documents with extracted values and lineage, the calculation pack, client approval and versions, SARS transactions, then the
    Declaration Alert, verification/audit and ITA34/remedies sections when they apply, the case's audit trail and retention.
    Every change goes through ENGINE with ACTOR.me(): the kit's shared actions (vk.release, vk.resolve, vk.close), the board's moves
-   (cases.fwd, cases.back) and this page's own actions (cases.decide, cases.recalc, cases.na). Refusals show the engine's reason. */
+   (cases.fwd, cases.back) and this page's own actions: cases.req (tick a gate checklist item, ENGINE.markReq), cases.values (record the
+   values read from a document, ENGINE.setInputs), cases.decide, cases.recalc, cases.na and cases.remedy (ENGINE.chooseRemedy).
+   Buttons only one role may use are locked for the others, with the reason; ENGINE checks the role again. Refusals show the
+   engine's reason. File names and free text go through VK.scrub, so ID and tax numbers in them stay masked. */
 (() => {
   const AUDIT_N = 30;
   const dd = (iso) => { const d = VK.toDay(iso); return d ? fDate(d) : String(iso || ''); };  // a calendar day as text, e.g. 8 Dec 2026
   const short = (h) => (h ? String(h).slice(0, 10) + '…' : '—');
-  const lockNote = (text) => `<span class="lock">${I.lock}${esc(text)}</span>`;
+  const TC = 'Tax Consultant';
+  const tcLock = () => (S.role === TC ? null : 'Tax Consultant only');
   const yes = (v) => (v === true ? VK.pill('Yes', 'info') : v === false ? VK.pill('No', '') : '<span class="muted">Not answered</span>');
   const whoRel = (g) => {
     const r = RELEASE[g];
@@ -96,7 +100,7 @@
   /* ---------- exceptions ---------- */
   function exAction(x) {
     if (ENGINE.isOpen(x)) return VK.exceptionBtn({ x, need: 'resolve' });
-    if (x.status === 'resolved' && x.secondary) return x.secondary === S.role ? VK.exceptionBtn({ x, need: 'close' }) : lockNote('Closed by the ' + x.secondary);
+    if (x.status === 'resolved' && x.secondary) return VK.exceptionBtn({ x, need: 'close' });
     return '';
   }
   function exRow(x) {
@@ -113,7 +117,7 @@
       + (closed.length ? `<details class="cs-more"><summary>${esc(plural(closed.length, 'closed exception'))}</summary>${VK.table(cols, closed.map(exRow), { caption: 'Closed exceptions on ' + c.id })}</details>` : '');
     return VK.section('cases-case-exceptions', 'Exceptions', body, {
       count: live.filter((x) => ENGINE.isOpen(x)).length,
-      intro: esc('S1 stops every gate on the case; S2 blocks the gates it is mapped to. A resolved exception with a secondary reviewer keeps blocking until a different person closes it.'),
+      intro: esc('S1 stops every gate on the case. Otherwise the register’s Blocking column decides: a blocking code stops the gates it is mapped to, whatever its severity (S2 or S3). A resolved exception with a secondary reviewer keeps blocking until a different person closes it.'),
       actions: '<a href="#exceptions">Exception register</a>',
     });
   }
@@ -121,44 +125,61 @@
   /* ---------- four-source analysis ---------- */
   const TOPIC_FIELDS = { employment: ['remuneration', 'medicalFringe', 'paye', 'retirementFund'], medical: ['medicalFees', 'medicalExpenses'], ra: ['ra'], interest: ['interest', 'dividends'],
     rental: ['rentalIncome', 'rentalExpenses'], cgt: ['capitalGain'], foreign: ['foreignIncome', 'foreignTaxCredit'], travel: ['travel'], homeoffice: ['homeOffice'], donations: ['donations'] };
+  // Step 6 of the master document names the four sources, in this order (verbatim, without the full stop).
+  const SOURCES = ((STEP[6] && STEP[6].items) || ['Previous submitted ITR12.', 'Current SARS pre-populated ITR12.', 'Previous firm supporting-document request.', 'Current-year client tax questionnaire.']).map((t) => String(t).replace(/\.$/, ''));
+  // Last year's document request: the case's own record when it has one; otherwise the documents last year's return needed.
+  const lastRequest = (c) => (Array.isArray(c.priorRequest) ? { kinds: c.priorRequest.slice(), kept: true }
+    : { kinds: ENGINE.QUESTIONS.filter((q) => c.priorYear.includes(q.key) && q.kind).map((q) => q.kind), kept: false });
   function sourcesBlock(c) {
     const Q = ENGINE.QUESTIONS; const ans = c.questionnaire.answers || {}; const pre = (c.prepop && c.prepop.data) || {};
-    const lines = (c.inputs && c.inputs.lines) || [];
-    const topics = Q.filter((q) => c.questionnaire.required.includes(q.key) || q.key in ans || c.priorYear.includes(q.key)
+    const lines = (c.inputs && c.inputs.lines) || []; const req = lastRequest(c);
+    const topics = Q.filter((q) => c.questionnaire.required.includes(q.key) || q.key in ans || c.priorYear.includes(q.key) || req.kinds.includes(q.kind)
       || (TOPIC_FIELDS[q.key] || []).some((f) => f in pre) || c.items.some((it) => it.kind === q.kind));
     const rows = topics.map((q) => {
       const fields = TOPIC_FIELDS[q.key] || [];
       const sars = fields.filter((f) => f in pre);
       const docs = c.docs.filter((d) => { const it = c.items.find((x) => x.id === d.itemId); return d.kind === q.kind || (it && it.kind === q.kind); });
       const got = fields.map((f) => [f, lines.filter((l) => l.field === f)]).filter(([, ls]) => ls.length);
-      const prior = c.priorYear.includes(q.key);
-      // Open exceptions on this topic: raised on the topic itself (QUE-*), on its checklist items or on its documents (DOC-02, AI-01 ...).
+      const lineIds = got.flatMap(([, ls]) => ls.map((l) => l.id));
+      const prior = c.priorYear.includes(q.key); const askedLast = req.kinds.includes(q.kind); const askedNow = c.items.some((it) => it.kind === q.kind);
+      const answered = q.key in ans; const said = ans[q.key];
+      // Open exceptions on this topic: raised on the topic itself (QUE-*), on its checklist items, on its documents (DOC-02, AI-01 ...)
+      // or on one of its extracted values (a judgement item such as TAX-02 or AI-05).
       const itemIds = c.items.filter((it) => it.kind === q.kind).map((it) => it.id); const docIds = docs.map((d) => d.id);
-      const xs = ENGINE.exOf(c).filter((x) => ENGINE.isOpen(x) && (x.item === q.key || itemIds.includes(x.item) || (x.docId && docIds.includes(x.docId))));
+      const xs = ENGINE.exOf(c).filter((x) => ENGINE.isOpen(x) && (x.item === q.key || itemIds.includes(x.item) || (x.docId && docIds.includes(x.docId)) || (x.calcRef && lineIds.includes(x.calcRef))));
+      const evidence = docs.length > 0 || got.length > 0;
       const find = [];
-      if (prior && ans[q.key] === false) find.push(['Declared last year, not this year', 'warn']);
-      if (!prior && ans[q.key] === true) find.push(['New this year', 'info']);
-      if (ans[q.key] === true && !docs.some((d) => d.status === 'validated') && !c.items.some((it) => it.kind === q.kind && it.na === 'approved')) find.push(['Document outstanding', 'warn']);
+      if (!answered) find.push([evidence ? 'Documents, but not in the questionnaire' : 'Not answered yet', 'warn']);
+      else if (said === false && evidence) find.push(['Documents, but the client answered no', 'warn']);
+      if (prior && said === false) find.push(['Declared last year, not this year', 'warn']);
+      else if (askedLast && !askedNow && said !== true) find.push(['Requested last year, not this year', 'warn']);
+      if (!prior && said === true) find.push(['New this year', 'info']);
+      if (said === false && sars.length) find.push(['SARS has pre-populated data, but the client answered no', 'warn']);
+      if (said === true && !docs.some((d) => d.status === 'validated') && !c.items.some((it) => it.kind === q.kind && it.na === 'approved')) find.push(['Document outstanding', 'warn']);
       sars.forEach((f) => {
         const mine = lines.filter((l) => l.field === f).reduce((a, l) => a + l.amount, 0);
         if (got.some(([k]) => k === f) && Math.abs(mine - pre[f]) > S.policy.materiality.amount) find.push([(CALC.FIELDS[f] || {}).label + ' differs from SARS', 'bad']);
       });
+      // "Consistent" only when the client answered and nothing else is flagged or open on the topic.
       if (!find.length && !xs.length) find.push(['Consistent', 'ok']);
       return [
         `<strong>${esc(q.label)}</strong>`,
-        yes(ans[q.key]),
-        sars.length ? sars.map((f) => `<div class="small">${esc((CALC.FIELDS[f] || {}).label || f)}: ${VK.money(pre[f])}</div>`).join('') : '<span class="muted">Nothing</span>',
         prior ? VK.pill('Declared', 'info') : '<span class="muted">Not declared</span>',
-        (docs.length ? docs.map((d) => `<div class="small">${esc(d.name)} ${docStatus(d)}</div>`).join('') : '<span class="muted">None</span>')
+        sars.length ? sars.map((f) => `<div class="small">${esc((CALC.FIELDS[f] || {}).label || f)}: ${VK.money(pre[f])}</div>`).join('') : '<span class="muted">Nothing</span>',
+        askedLast ? VK.pill('Requested', 'info') : '<span class="muted">Not requested</span>',
+        yes(ans[q.key]),
+        (docs.length ? docs.map((d) => `<div class="small">${esc(VK.scrub(d.name))} ${docStatus(d)}</div>`).join('') : '<span class="muted">None</span>')
           + got.map(([f, ls]) => `<div class="small muted">${esc((CALC.FIELDS[f] || {}).label || f)}: ${VK.money(ls.reduce((a, l) => a + l.amount, 0))}</div>`).join(''),
         find.map(([t, tone]) => VK.pill(t, tone)).join(' ')
           + xs.map((x) => `<div class="small">${VK.codeChip(x.code, x)} ${esc(VK.scrub(x.note || x.title))}</div>`).join(''),
       ];
     });
-    const intro = 'Operon compares four sources for each topic: the client’s questionnaire, SARS’s pre-populated data, last year’s return and the documents with their extracted values. The last column is Operon’s comparison, with any open exception on the topic. '
+    const intro = 'Step 6: Operon’s AI (simulated) compares four sources for each topic: ' + SOURCES.map((t, i) => (i + 1) + '. ' + t.charAt(0).toLowerCase() + t.slice(1)).join('; ')
+      + '. The documents and their extracted values are the evidence. The last column is the comparison, with any open exception on the topic; it says “Consistent” only when the client has answered and nothing is flagged or open. '
+      + (req.kept ? '' : 'The preview keeps no separate record of last year’s document request, so it shows the documents last year’s return needed. ')
       + (c.prepop ? 'Pre-populated data ' + (c.prepop.ref || '') + ' received ' + fWhen(c.prepop.at) + '. ' : 'No pre-populated data has arrived from SARS (simulated). ')
       + (c.inputs && c.inputs.prior && typeof c.inputs.prior.taxableIncome === 'number' ? 'Last year’s taxable income: ' + CALC.rand(c.inputs.prior.taxableIncome) + '.' : '');
-    return VK.section('cases-case-sources', 'Four-source analysis', VK.table([{ label: 'Topic' }, { label: 'Questionnaire' }, { label: 'SARS pre-populated' }, { label: 'Last year' }, { label: 'Documents and values' }, { label: 'Comparison' }], rows,
+    return VK.section('cases-case-sources', 'Four-source analysis', VK.table([{ label: 'Topic' }, { label: 'Last year’s ITR12' }, { label: 'SARS pre-populated' }, { label: 'Last year’s document request' }, { label: 'This year’s questionnaire' }, { label: 'Evidence: documents and values' }, { label: 'Comparison' }], rows,
       { caption: 'Four-source analysis for ' + c.id, empty: 'No topics yet: the questionnaire has not been answered.' }), { intro: esc(intro) });
   }
 
@@ -171,47 +192,63 @@
       let act = '';
       if (it.na === 'requested') act = btn('Approve N/A', 'cases.na', { cls: 'sm', data: { case: c.id, item: it.id } });
       return [`<strong>${esc(it.label)}</strong><div class="small muted mono">${esc(it.id)}</div>`, VK.pill(word, tone),
-        docs.length ? docs.map((d) => `<div class="small">${esc(d.name)} ${docStatus(d)}</div>`).join('') : '<span class="muted">None yet</span>',
+        docs.length ? docs.map((d) => `<div class="small">${esc(VK.scrub(d.name))} ${docStatus(d)}</div>`).join('') : '<span class="muted">None yet</span>',
         it.naReason ? `<div class="small">${esc(VK.scrub('Client: ' + it.naReason))}</div>${it.na === 'requested' ? '<div class="small muted">Waiting for the Tax Consultant</div>' : ''}` : '<span class="muted">—</span>', act];
     });
-    const reqs = Object.keys(c.req).sort().flatMap((g) => c.req[g].map((r) => `<div class="vk-row"><span class="vk-gate vk-g-${r.done ? 'done' : 'idle'}"><b>${esc(g)}</b></span><div class="vk-row-b"><div class="vk-row-t">${esc(r.label)}</div><div class="vk-meta">${r.done ? `${VK.pill('Done', 'ok')}<span>${esc(VK.who(r.by))}</span>${VK.when(r.at)}` : VK.pill('To do', 'warn')}</div></div></div>`));
+    // Each gate checklist item is ticked by the person who owns that gate (RELEASE in workflow.js); others see who does it.
+    const reqs = Object.keys(c.req).sort().flatMap((g) => c.req[g].map((r) => {
+      const owner = (RELEASE[g] || {}).role;
+      const act = r.done ? '' : `<span class="cs-reqact">${btn('Mark done', 'cases.req', { cls: 'sm', data: { case: c.id, gate: g, key: r.key }, lock: owner && S.role !== owner ? 'Done by the ' + owner + ', who owns ' + g : null })}</span>`;
+      return `<div class="vk-row cs-req"><span class="vk-gate vk-g-${r.done ? 'done' : 'idle'}"><b>${esc(g)}</b></span><div class="vk-row-b"><div class="vk-row-t">${esc(r.label)}</div><div class="vk-meta">${r.done ? `${VK.pill('Done', 'ok')}<span>${esc(VK.who(r.by))}</span>${VK.when(r.at)}` : VK.pill('To do', 'warn')}</div></div>${act}</div>`;
+    }));
     return VK.section('cases-case-checklist', 'Personalised checklist', VK.table([{ label: 'Item' }, { label: 'State' }, { label: 'Documents' }, { label: 'Not available' }, { label: '', cls: 'vk-act' }], rows,
       { caption: 'Checklist for ' + c.id, empty: 'Nothing has been requested yet.' })
       + `<h3 class="cs-h3">Gate checklists</h3>` + VK.list(reqs, { empty: 'No gate checklist items.' }), {
       count: c.items.length,
-      intro: esc('Built from the questionnaire and last year’s return: each yes adds the document it needs. The client uploads in the PaperSync portal (simulated) or asks to mark an item not available, which the Tax Consultant approves.'),
+      intro: esc('Built from the questionnaire and last year’s return: each yes adds the document it needs. The client uploads in the PaperSync portal (simulated) or asks to mark an item not available, which the Tax Consultant approves. Each gate checklist item is ticked by the owner of that gate; the gate cannot be released until its items are done.'),
     });
   }
 
   /* ---------- documents and lineage ---------- */
+  // The calculator fields a document of this kind can feed (CALC.FIELDS[...].kinds).
+  const fieldsFor = (kind) => Object.keys(CALC.FIELDS).filter((k) => (CALC.FIELDS[k].kinds || []).includes(kind));
+  function valuesBtn(c, d) {
+    if (d.status !== 'validated' || !fieldsFor(d.kind).length) return '';
+    const n = ((c.inputs && c.inputs.lines) || []).filter((l) => l.docId === d.id).length;
+    const lock = tcLock() || (c.submission && c.submission.ok ? 'The return is submitted; a correction goes through G15' : null);
+    return btn(n ? 'Change values' : 'Record values', 'cases.values', { cls: 'sm' + (n ? '' : ' primary'), data: { case: c.id, doc: d.id }, lock });
+  }
   function documentsBlock(c) {
     const docs = c.docs.map((d) => {
       const it = c.items.find((x) => x.id === d.itemId);
       const kind = d.kind ? (DOC_KINDS.find((k) => k.kind === d.kind) || {}).label || d.kind : 'Not classified';
-      return [`<strong>${esc(d.name)}</strong><div class="small muted mono">${esc(d.id)} · ${esc(Math.round(d.size / 1024) + ' KB')}</div>`, esc(it ? it.label : '—'),
+      const n = ((c.inputs && c.inputs.lines) || []).filter((l) => l.docId === d.id).length;
+      return [`<strong>${esc(VK.scrub(d.name))}</strong><div class="small muted mono">${esc(d.id)} · ${esc(Math.round(d.size / 1024) + ' KB')}</div>`, esc(it ? it.label : '—'),
         `${VK.when(d.at)}<div class="small muted">${esc(VK.who(d.by))}</div>`, docStatus(d),
         `<div class="small">${esc(kind)}</div>${d.confidence != null ? `<div class="small muted">${esc('Confidence ' + Math.round(d.confidence * 100) + '%')}</div>` : ''}`,
-        `<span class="mono small" title="${esc('SHA-256 ' + (d.hash || ''))}">${esc(short(d.hash))}</span>`];
+        `<span class="mono small" title="${esc('SHA-256 ' + (d.hash || ''))}">${esc(short(d.hash))}</span>`,
+        `${n ? `<div class="small">${esc(plural(n, 'value'))}</div>` : ''}${valuesBtn(c, d)}`];
     });
-    const lin = CALC.lineage(c).map((l) => [`<span class="mono">${esc(l.line)}</span>`, l.file ? `${esc(l.file)}${l.doc ? `<div class="small muted mono">${esc(l.doc)}</div>` : ''}` : '<span class="muted">No source</span>',
-      esc(l.ref), VK.money(l.amount), esc(l.category), `<span class="mono small">${esc(l.field)}</span>`,
+    const lin = CALC.lineage(c).map((l) => [`<span class="mono">${esc(l.line)}</span>`, l.file ? `${esc(VK.scrub(l.file))}${l.doc ? `<div class="small muted mono">${esc(l.doc)}</div>` : ''}` : '<span class="muted">No source</span>',
+      esc(VK.scrub(l.ref)), VK.money(l.amount), esc(l.category), `<span class="small">${esc((CALC.FIELDS[l.field] || {}).label || l.field)}</span>`,
       l.judgement ? (l.decided ? `${VK.pill('Decided', 'ok')}<div class="small">${esc(VK.scrub(l.decided.rationale))}</div>` : `${VK.pill('Judgement: ' + l.judgement, 'warn')}`) : '<span class="muted">Rules</span>']);
-    return VK.section('cases-case-documents', 'Documents and lineage', VK.table([{ label: 'Document' }, { label: 'Checklist item' }, { label: 'Uploaded' }, { label: 'Check' }, { label: 'AI reading (simulated)' }, { label: 'Hash' }], docs,
+    return VK.section('cases-case-documents', 'Documents and lineage', VK.table([{ label: 'Document' }, { label: 'Checklist item' }, { label: 'Uploaded' }, { label: 'Check' }, { label: 'AI reading (simulated)' }, { label: 'Hash' }, { label: 'Extracted values', cls: 'vk-act' }], docs,
       { caption: 'Documents on ' + c.id, empty: 'No documents yet.' })
       + `<h3 class="cs-h3">Extracted values and where they came from</h3>`
       + VK.table([{ label: 'Value' }, { label: 'Document' }, { label: 'Reference' }, { label: 'Amount' }, { label: 'Tax category' }, { label: 'Calculator field' }, { label: 'Treatment' }], lin,
         { caption: 'Lineage for ' + c.id, empty: 'No values extracted yet.' }), {
       count: c.docs.length,
-      intro: esc('The AI checks each upload by its name and size only (simulated): file contents are never read. Lineage runs from the document to the extracted value, its tax category and the calculator field.'),
+      intro: esc('The AI checks each upload by its name and size only (simulated): file contents are never read, so the Tax Consultant records the values read from each checked document. Lineage runs from the document to the extracted value, its tax category and the calculator field.'),
     });
   }
 
   /* ---------- calculation pack ---------- */
   function calcBlock(c) {
     const k = c.calc; const canCalc = !!c.inputs;
-    const recalc = canCalc ? btn('Recalculate', 'cases.recalc', { cls: 'sm', data: { case: c.id } }) : '';
+    const recalc = canCalc ? btn('Recalculate', 'cases.recalc', { cls: 'sm', data: { case: c.id }, lock: tcLock() }) : '';
     if (!k) {
-      return VK.section('cases-case-calc', 'Calculation pack', VK.empty(canCalc ? 'Not calculated yet.' : 'No calculation yet: no values have been extracted.'), { actions: recalc });
+      return VK.section('cases-case-calc', 'Calculation pack', VK.empty(canCalc ? 'Not calculated yet.' : 'No calculation yet: no values have been extracted.',
+        canCalc ? null : { html: '<p class="small muted">The Tax Consultant records the values from each checked document under Documents and lineage, then recalculates.</p>' }), { actions: recalc });
     }
     const summary = k.summary || {}; const errors = k.errors || [];
     const sum = ITA34_FIELDS.map((f) => [f.label, VK.money(summary[f.key])]);
@@ -223,7 +260,7 @@
       const decided = l && l.decided;
       return [`<span class="mono">${esc(p.line)}</span>`, esc(p.label), VK.money(p.amount), VK.codeChip(p.code, ENGINE.openOf(c, p.code)[0]),
         decided ? `${VK.pill('Decided: recalculate to use it', 'info')}<div class="small">${esc(VK.scrub(decided.rationale))}</div>` : '<span class="muted">Left out until decided</span>',
-        p.field ? btn('Decide', 'cases.decide', { cls: 'sm' + (decided ? '' : ' primary'), data: { case: c.id, line: p.line } }) : ''];
+        p.field ? btn('Decide', 'cases.decide', { cls: 'sm' + (decided ? '' : ' primary'), data: { case: c.id, line: p.line }, lock: tcLock() }) : ''];
     });
     const sch = c.schedules || {}; const schRows = [];
     if (sch.interest && sch.interest.gross) schRows.push(['Interest', 'Gross ' + CALC.rand(sch.interest.gross) + ', exempt ' + CALC.rand(sch.interest.exempt) + ' (limit ' + CALC.rand(sch.interest.limit) + '), taxable ' + CALC.rand(sch.interest.taxable)]);
@@ -311,7 +348,7 @@
   function draftsList(t) {
     if (!t.drafts || !t.drafts.length) return VK.empty('No answers drafted yet.');
     return `<p class="small muted">${esc('Drafted by ' + (t.draftedBy ? VK.who(t.draftedBy) : 'nobody') + ' ' + (t.draftedAt ? fWhen(t.draftedAt) : '') + '. The Tax Consultant reviews every answer before anything goes to SARS.')}</p>`
-      + VK.list(t.drafts.map((d) => `<div class="vk-row-b"><div class="vk-row-t">${esc(d.q)}</div><div>${esc(VK.scrub(d.a))}</div><div class="vk-meta">${d.evidence ? `<span>Evidence: ${esc(d.evidence)}</span>` : VK.pill('No evidence yet', 'warn')}</div></div>`));
+      + VK.list(t.drafts.map((d) => `<div class="vk-row-b"><div class="vk-row-t">${esc(d.q)}</div><div>${esc(VK.scrub(d.a))}</div><div class="vk-meta">${d.evidence ? `<span>Evidence: ${esc(VK.scrub(d.evidence))}</span>` : VK.pill('No evidence yet', 'warn')}</div></div>`));
   }
   function daBlock(c) {
     const d = c.da; if (!d) return '';
@@ -360,6 +397,10 @@
     body += `<h3 class="cs-h3">Client decision</h3>` + (dec ? VK.facts([['Decision', esc(dec.choice === 'accept' ? 'Accept the assessment' : dec.choice === 'instruct' ? 'Instruct the firm to dispute it' : dec.choice)], ['When', VK.when(dec.at)], ['Note', dec.note ? esc(VK.scrub(dec.note)) : '<span class="muted">None</span>'], ['G14', VK.gateChip(c, 'G14')]])
       : '<p class="small muted">The client has not decided yet (PaperSync portal, simulated).</p>');
     const rem = c.remedy;
+    if (ENGINE.applies(c, 'G15') && !ENGINE.stepDone(c, 'G15')) {
+      body += `<div class="cs-remedy">${!rem ? `<p class="small">${esc('The client instructed the firm to act. The Tax Consultant chooses the remedy route and records the grounds and evidence; the client then authorises it in the PaperSync portal.')}</p>` : ''}`
+        + btn(rem ? 'Change the remedy or its evidence' : 'Choose the remedy', 'cases.remedy', { cls: 'sm' + (rem ? '' : ' primary'), data: { case: c.id }, lock: tcLock() }) + '</div>';
+    }
     if (rem) {
       const p = PERIODS[rem.route];
       body += `<h3 class="cs-h3">Remedy</h3>` + VK.facts([
@@ -460,6 +501,90 @@
     'cases.na': (t) => {
       const c = caseOf(t); if (!c) return;
       VK.done(ENGINE.approveNa(c, t.dataset.item, ACTOR.me()), 'Approved: the item is marked not available.');
+    },
+    // Tick a gate checklist item (ENGINE.markReq), for example G02's comparison with the SARS registered details or G13's review.
+    'cases.req': (t) => {
+      const c = caseOf(t); if (!c) return;
+      const r = (c.req[t.dataset.gate] || []).find((x) => x.key === t.dataset.key);
+      if (!r) { toast('That checklist item is no longer on the case.'); render(); return; }
+      VK.done(ENGINE.markReq(c, t.dataset.gate, r.key, ACTOR.me()), 'Done: ' + r.label + ' (' + t.dataset.gate + ').');
+    },
+    // The values read from one checked document (ENGINE.setInputs): calculator field, reference and amount per value. The other
+    // documents' values are kept. A medical scheme certificate also gives the months on the scheme and the dependants.
+    'cases.values': (t) => {
+      const c = caseOf(t); if (!c) return;
+      const d = c.docs.find((x) => x.id === t.dataset.doc);
+      if (!d) { toast('That document is no longer on the case.'); render(); return; }
+      const fields = fieldsFor(d.kind); const all = ((c.inputs && c.inputs.lines) || []);
+      const mine = all.filter((l) => l.docId === d.id); const ROWS = Math.max(3, mine.length + 1);
+      const kindLabel = (DOC_KINDS.find((k) => k.kind === d.kind) || {}).label || 'document';
+      const med = (c.inputs && c.inputs.medical) || {};
+      const opt = (cur) => `<option value="">Choose the calculator field</option>` + fields.map((k) => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(CALC.FIELDS[k].label + ' (' + CALC.FIELDS[k].cat + ')')}</option>`).join('');
+      const row = (i) => { const l = mine[i] || {};
+        return `<fieldset class="cs-val"><legend class="small muted">${esc(l.id ? 'Value ' + l.id : 'New value')}</legend>
+          <label class="f" for="cs-v-f${i}">Calculator field<select id="cs-v-f${i}" name="f${i}">${opt(l.field)}</select></label>
+          <label class="f" for="cs-v-r${i}">Reference on the document<input id="cs-v-r${i}" name="r${i}" maxlength="120" autocomplete="off" value="${esc(l.ref || '')}" placeholder="For example IRP5 code 3601"></label>
+          <label class="f" for="cs-v-a${i}">Amount (rand)<input id="cs-v-a${i}" name="a${i}" inputmode="decimal" autocomplete="off" value="${l.amount == null ? '' : esc(l.amount)}"></label></fieldset>`; };
+      modal('Values from ' + kindLabel, `${VK.facts([['Case', VK.caseWho(c)], ['Document', esc(VK.scrub(d.name)) + ' · ' + docStatus(d)]])}
+        <div class="cs-vals">${Array.from({ length: ROWS }, (_, i) => row(i)).join('')}</div>
+        ${d.kind === 'medical' ? `<div class="cs-val-med"><label class="f" for="cs-v-months">Months on the medical scheme<input id="cs-v-months" name="months" inputmode="numeric" autocomplete="off" value="${esc(med.months == null ? 12 : med.months)}"></label>
+          <label class="f" for="cs-v-deps">Dependants on the scheme<input id="cs-v-deps" name="deps" inputmode="numeric" autocomplete="off" value="${esc(med.dependants == null ? 0 : med.dependants)}"></label></div>` : ''}
+        <p class="hint">${esc('You record them as ' + S.role + ' (' + me().name + '). Leave a row empty to drop it. The AI reading is simulated, so a person keys in what the document shows. Recalculate afterwards to use them.')}</p>`,
+      'Record values', (fd) => {
+        const used = new Set(all.filter((l) => l.docId !== d.id).map((l) => l.id));
+        let next = all.reduce((m, l) => Math.max(m, +(/^L(\d+)$/.exec(l.id) || [0, 0])[1]), 0);
+        const lines = [];
+        for (let i = 0; i < ROWS; i++) {
+          const f = String(fd['f' + i] || ''); const ref = String(fd['r' + i] || '').trim(); const raw = String(fd['a' + i] || '').replace(/[\sR,]/g, '');
+          if (!f && !ref && !raw) continue;
+          if (!fields.includes(f)) return 'Row ' + (i + 1) + ': choose the calculator field.';
+          if (raw === '' || !/^-?\d+(\.\d{1,2})?$/.test(raw)) return 'Row ' + (i + 1) + ': give the amount as a number, for example 455000 or 1234.56.';
+          const amount = Number(raw); const was = mine[i];
+          let id = was && was.id && !used.has(was.id) ? was.id : null;
+          if (!id) { do { next += 1; id = 'L' + next; } while (used.has(id)); }
+          used.add(id);
+          const line = { id, docId: d.id, ref: ref || CALC.FIELDS[f].label, field: f, amount };
+          if (was && was.decided && was.field === f && was.amount === amount) line.decided = was.decided;
+          lines.push(line);
+        }
+        const inputs = Object.assign({}, c.inputs || {}, { lines: all.filter((l) => l.docId !== d.id).concat(lines) });
+        if (d.kind === 'medical') {
+          const months = Number(fd.months); const deps = Number(fd.deps);
+          if (!Number.isInteger(months) || months < 0 || months > 12) return 'Months on the medical scheme: a whole number from 0 to 12.';
+          if (!Number.isInteger(deps) || deps < 0) return 'Dependants: a whole number, 0 or more.';
+          inputs.medical = Object.assign({}, inputs.medical || {}, { months, dependants: deps });
+        }
+        if (!inputs.medical) inputs.medical = { months: 0, dependants: 0 };
+        return finish(ENGINE.setInputs(c, ACTOR.me(), inputs, { note: 'Recorded the values read from the ' + kindLabel + ' (' + d.id + ')' }),
+          'Recorded ' + plural(lines.length, 'value') + ' from the ' + kindLabel + '. Recalculate to use them.');
+      });
+    },
+    // The remedy route after the client instructs the firm (ENGINE.chooseRemedy): the route, with its statutory deadline shown,
+    // and the grounds and evidence. Choosing again changes the route or updates the evidence.
+    'cases.remedy': (t) => {
+      const c = caseOf(t); if (!c) return;
+      const routes = REMEDY_FN.concat(['advice']); const cur = c.remedy ? c.remedy.route : '';
+      const opt = (r) => {
+        const label = r === 'advice' ? 'Documented advice, no SARS action' : SARS_FN[r].label;
+        const dl = r === 'advice' ? null : ENGINE.remedyDeadline(c, r); const p = PERIODS[r];
+        const note = r === 'advice' ? 'No SARS transaction: the advice is recorded and G15 passes on the Tax Consultant’s release.'
+          : (dl && dl.deadline ? 'Due ' + fDate(VK.toDay(dl.deadline)) + ': ' + p.days + ' business days from ' + dl.basis + ', 16 Dec to 15 Jan not counted (' + p.rule + ').'
+            : (dl && dl.basis ? VK.scrub(dl.basis) : 'No statutory deadline in the preview.')) + (SARS_FN[r].approved ? '' : ' Outside the SARS interface the documents assume: sending it raises INT-08.');
+        return `<label><input type="radio" name="route" value="${esc(r)}"${r === cur ? ' checked' : ''}> <span><strong>${esc(label)}</strong><br><span class="small muted">${esc(note)}</span></span></label>`;
+      };
+      modal((c.remedy ? 'Change the remedy for ' : 'Choose the remedy for ') + c.id, `${VK.facts([['Case', VK.caseWho(c)], ['Client decision', c.decision ? esc(c.decision.choice === 'instruct' ? 'Instructed the firm to dispute the assessment' : c.decision.choice) + (c.decision.note ? '<div class="small muted">' + esc(VK.scrub(c.decision.note)) + '</div>' : '') : '<span class="muted">None yet</span>']])}
+        <fieldset class="ops-radios"><legend class="small muted">Remedy route</legend>${routes.map(opt).join('')}</fieldset>
+        <label class="f" for="cs-rem-ev">Grounds and evidence (required)<textarea id="cs-rem-ev" name="evidence" maxlength="1000">${esc(c.remedy && c.remedy.evidence ? c.remedy.evidence : '')}</textarea></label>
+        <p class="hint">${esc('You choose as ' + S.role + ' (' + me().name + '). The client then authorises the route in the PaperSync portal (simulated); G15 and G18 follow before anything is sent to SARS, which is simulated too.')}</p>`,
+      'Choose remedy', (fd) => {
+        const route = String(fd.route || '');
+        if (!routes.includes(route)) return 'Choose a remedy route.';
+        const evidence = String(fd.evidence || '').trim();
+        if (!evidence) return 'Record the grounds and evidence.';
+        const r = ENGINE.chooseRemedy(c, ACTOR.me(), route, { evidence });
+        const label = route === 'advice' ? 'documented advice' : SARS_FN[route].label;
+        return finish(r, 'Chose the remedy: ' + label + (r && r.deadline ? ', due ' + fDate(VK.toDay(r.deadline)) : '') + '.');
+      });
     },
   });
 })();

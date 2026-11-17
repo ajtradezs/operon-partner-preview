@@ -1,7 +1,9 @@
 """Build the Operon partner preview (index.html) from src/ in a fixed order. No fragment patching.
 
 Usage:  python -I tools/build.py            regenerate src/itr12/register.gen.js (when the workbook is present) and build index.html
-        python -I tools/build.py --check    regenerate the register in memory and fail if the committed file differs
+        python -I tools/build.py --check    regenerate the register and workflow in memory and fail if the committed files differ;
+                                            then run the safety checks on the committed index.html and fail unless it is the
+                                            build of the current src/ (the data-build timestamp aside)
         python -I tools/build.py --out DIR/index.html [--only views-cases,views-case]
                                             a private build: no regeneration and nothing written in the repo; --only keeps just
                                             the named screen modules (views-kit.js and views.css always stay), so unfinished work
@@ -438,12 +440,34 @@ def check(html: str):
         for word in DENYLIST_FILE.read_text(encoding="utf-8").splitlines():
             word = word.strip()
             assert not word or word.lower() not in low, "A deny-listed string appears in the build"
+    else:
+        print("WARNING: no deny-list file, so the real-name check was skipped")
+
+
+BUILD_STAMP = re.compile(r'data-build="[0-9TZ]+"')
+
+
+def check_committed():
+    """The committed index.html passes check() and is exactly the build of the current src/ (the data-build timestamp aside)."""
+    built = ROOT / "index.html"
+    if not built.exists():
+        raise SystemExit("index.html is missing; run tools/build.py")
+    committed = built.read_text(encoding="utf-8")
+    try:
+        check(committed)
+    except AssertionError as e:
+        raise SystemExit("index.html fails the safety checks: %s" % e)
+    html, _, _ = assemble()
+    if BUILD_STAMP.sub("", html) != BUILD_STAMP.sub("", committed):
+        raise SystemExit("index.html is out of date with src/ (or was edited by hand); run tools/build.py")
+    print("index.html passes the safety checks and matches the build of src/")
 
 
 def main(argv):
     if "--check" in argv:
         generate_register(check_only=True)
         generate_workflow(check_only=True)
+        check_committed()
         return
     out = Path(argv[argv.index("--out") + 1]) if "--out" in argv else None
     only = set(argv[argv.index("--only") + 1].split(",")) if "--only" in argv else None

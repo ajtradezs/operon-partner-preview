@@ -1,4 +1,4 @@
-/* Approvals: every gate waiting for the signed-in role (this replaces the old sign-off and lodge trays), the G18 two-person
+/* Approvals: every gate waiting for the signed-in role, the G18 two-person
    sign-offs on the simulated SARS link, and the severity and override requests the Records/Compliance Owner approves.
    Read-only: releases and G18 sign-offs use the kit's shared actions (ACT 'vk.release'); the request buttons use 'ops.sevOk' and
    'ops.ovOk' (views-exceptions.js), which call ENGINE with ACTOR.me(). */
@@ -113,7 +113,7 @@
 
   VIEWS.approvals = () => {
     const role = S.role;
-    const intro = `${esc(role)} · ${esc(me().name)}. ` + esc('Every gate waiting for your role, with its criteria and what still blocks it. This replaces the old sign-off and lodge trays.');
+    const intro = `${esc(role)} · ${esc(me().name)}. ` + esc('Every gate waiting for your role, with its criteria and what still blocks it.');
     return VK.page('Approvals', intro, gatesBlock(role) + g18Block(role) + requestsBlock(role) + whoBlock(role), { key: 'ops-approvals' });
   };
 })();

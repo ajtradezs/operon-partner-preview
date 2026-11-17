@@ -38,10 +38,15 @@ const VK = (() => {
   // An ID number shows only its first 6 digits (the date of birth); a tax reference only its last 4.
   const maskId = (v) => { const s = String(v == null ? '' : v).replace(/\s/g, ''); return s.length <= 6 ? '•'.repeat(s.length) : s.slice(0, 6) + '•'.repeat(s.length - 6); };
   const maskTaxRef = (v) => { const s = String(v == null ? '' : v).replace(/\s/g, ''); return s.length <= 4 ? '•'.repeat(s.length) : '•'.repeat(s.length - 4) + s.slice(-4); };
-  const idHtml = (v) => `<span class="mono vk-masked" title="ID number, masked: only the date of birth shows">${esc(maskId(v))}</span>`;
+  // A client with no RSA ID number (a passport-only client) shows that plainly instead of an empty mask.
+  const idHtml = (v) => (String(v == null ? '' : v).trim() ? `<span class="mono vk-masked" title="ID number, masked: only the date of birth shows">${esc(maskId(v))}</span>` : '<span class="muted">No RSA ID number</span>');
   const taxRefHtml = (v) => `<span class="mono vk-masked" title="Tax reference, masked: only the last 4 digits show">${esc(maskTaxRef(v))}</span>`;
-  // Free text from the audit trail or notes: any bare 13-digit (ID) or 10-digit (tax reference) number is masked too.
-  const scrub = (t) => String(t == null ? '' : t).replace(/\b\d{13}\b/g, maskId).replace(/\b\d{10}\b/g, maskTaxRef);
+  // Free text from the audit trail, notes and file names: any 13-digit run (an ID number) or 10-digit run (a tax reference) is
+  // masked, even inside a word or next to an underscore (IRP5_9061007331_2026.pdf), so digit lookarounds are used, not \b.
+  // A calendar day written YYYY-MM-DD reads as a date (12 Nov 2026); an invalid one is left as it was received.
+  const isoDay = (m) => { const d = DATES.dt(m) ? toDay(m) : null; return d ? fDate(d) : m; };
+  const scrub = (t) => String(t == null ? '' : t).replace(/(?<!\d)\d{13}(?!\d)/g, maskId).replace(/(?<!\d)\d{10}(?!\d)/g, maskTaxRef)
+    .replace(/(?<![\d-])\d{4}-\d{2}-\d{2}(?![\d-])/g, isoDay);
 
   /* ---------- money and dates ---------- */
   const money = (n) => (n == null || n === '' || !isFinite(+n) ? '<span class="muted">—</span>' : `<span class="num">${esc(CALC.rand(+n))}</span>`);
@@ -260,7 +265,7 @@ const VK = (() => {
       const checks = ENGINE.g18Checks(tx); const gb = ENGINE.g18Blockers(tx);
       modal('Sign G18 for ' + tx.id, `${facts([['Case', esc(c.id) + ' · ' + esc(cl.name)], ['Transaction', esc(tx.id + ' · ' + tx.label + ' · version ' + tx.version)],
         ['Signed so far', tx.signoffs.length ? esc(tx.signoffs.map((s) => pname(s.id) + ' (' + s.role + ')').join(', ')) : 'Nobody yet']])}
-        <ol class="vk-checks">${checks.map((k) => `<li class="${k.ok ? 'ok' : 'bad'}">${k.ok ? I.check : I.alert}<span>${esc(k.label)}${k.ok ? '' : `<br><span class="err">${esc(k.why)}</span>`}</span></li>`).join('')}</ol>
+        <ol class="vk-checks">${checks.map((k) => `<li class="${k.ok ? 'ok' : 'bad'}">${k.ok ? I.check : I.alert}<span>${esc(k.label)}${k.ok ? '' : `<br><span class="err">${esc(scrub(k.why))}</span>`}</span></li>`).join('')}</ol>
         ${gb.length ? `<p class="err">Blocked by ${esc(gb.join(', '))}</p>` : ''}
         <p class="hint">G18 needs two different people: the Integration Administrator and the Tax Consultant. Nothing is sent to SARS: the link is simulated.</p>`,
       'Sign G18', () => finish(ENGINE.signG18(tx, ACTOR.me()), 'Signed G18 for ' + tx.id + '.'));
@@ -269,7 +274,7 @@ const VK = (() => {
     const cr = ENGINE.canRelease(c, g, ACTOR.me());
     modal('Release ' + g + ' for ' + c.id, `${facts([['Gate', esc(g + ' · ' + gateName(g))], ['Case', esc(c.id) + ' · ' + esc(cl.name)], ['Version', esc(ENGINE.vN(c) || 'none yet')]])}
       ${GATE[g].criterion ? `<p class="small"><span class="muted">Release when:</span> ${esc(GATE[g].criterion)}</p>` : ''}
-      ${cr.ok ? `<p class="vk-okline">${I.check} Every check for ${esc(g)} passes.</p>` : `<p class="err">${esc(cr.why)}</p>`}
+      ${cr.ok ? `<p class="vk-okline">${I.check} Every check for ${esc(g)} passes.</p>` : `<p class="err">${esc(scrub(cr.why))}</p>`}
       <label class="f" for="vk-rel-ev">Note or evidence (optional)<input id="vk-rel-ev" name="evidence" maxlength="300" autocomplete="off"></label>
       <p class="hint">You release it as ${esc(S.role)} (${esc(me().name)}). Operon records it in the audit trail.</p>`,
     'Release ' + g, (fd) => finish(ENGINE.release(c, g, ACTOR.me(), { evidence: String(fd.evidence || '').trim() }), 'Released ' + g + ' for ' + c.id + '.'));
@@ -283,7 +288,7 @@ const VK = (() => {
     modal('Resolve ' + x.id, `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
       ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Resolved when', esc(def.resolution || '')]])}
       ${x.note ? `<p class="note">${esc(scrub(x.note))}</p>` : ''}
-      ${guard ? `<p class="err">${esc(guard)}</p>` : ''}
+      ${guard ? `<p class="err">${esc(scrub(guard))}</p>` : ''}
       <label class="f" for="vk-res-action">What was done (required)<textarea id="vk-res-action" name="action" maxlength="1000"></textarea></label>
       <label class="f" for="vk-res-ev">Evidence (optional)<input id="vk-res-ev" name="evidence" maxlength="300" autocomplete="off" placeholder="A file name or reference"></label>
       ${x.secondary ? `<p class="hint">A different person in the ${esc(x.secondary)} role then closes it as secondary reviewer. It keeps blocking until then.</p>` : ''}`,
@@ -299,12 +304,44 @@ const VK = (() => {
     if (!x) { toast('That exception is no longer here.'); render(); return; }
     const c = x.caseId ? ENGINE.caseById(x.caseId) : null;
     modal('Close ' + x.id + ' as secondary reviewer', `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
-      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Resolved by', esc(x.resolvedBy || '')], ['What was done', esc(scrub(x.resolution || ''))], ['Evidence', esc(x.evidence || 'None given')]])}
+      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Resolved by', esc(x.resolvedBy || '')], ['What was done', esc(scrub(x.resolution || ''))], ['Evidence', esc(scrub(x.evidence || 'None given'))]])}
       <label class="f" for="vk-close-note">Review note (optional)<input id="vk-close-note" name="note" maxlength="300" autocomplete="off"></label>
       <p class="hint">Close it only if the resolution meets the register’s criterion. You must not be the person who resolved it.</p>`,
     'Close exception', (fd) => finish(ENGINE.close(x, ACTOR.me(), { note: String(fd.note || '').trim() }), 'Closed ' + x.id + ' (' + x.code + ').'));
   }
-  Object.assign(ACT, { 'vk.release': actRelease, 'vk.resolve': actResolve, 'vk.close': actClose });
+  // The register gives some codes to a platform role (AI-07, AI-06, VER-02) or a platform secondary reviewer (TAX-06). The platform
+  // team works outside the firm, so the preview simulates it: anyone may press the button, and ENGINE records the simulated
+  // ACTOR.platform(<that role>), never the signed-in person.
+  const isPlatform = (role) => /^Platform /.test(String(role || ''));
+  const SIM_NOTE = 'In real life the platform team does this outside Operon. Here it is simulated: Operon records it as the platform team, not as you.';
+  function actPlatResolve(t) {
+    const x = ENGINE.exById(t.dataset.ex);
+    if (!x || !isPlatform(x.owner)) { toast('That exception is no longer here.'); render(); return; }
+    const c = x.caseId ? ENGINE.caseById(x.caseId) : null; const def = CODE[x.code] || {};
+    const guard = ENGINE.resolveGuard(c, x);
+    modal('Resolve ' + x.id + ' as the simulated platform team', `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
+      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Owner', esc(x.owner + ' (simulated platform team)')], ['Resolved when', esc(def.resolution || '')]])}
+      ${guard ? `<p class="err">${esc(scrub(guard))}</p>` : ''}
+      <label class="f" for="vk-pres-action">What the platform team did (required)<textarea id="vk-pres-action" name="action" maxlength="1000"></textarea></label>
+      <label class="f" for="vk-pres-ev">Evidence (optional)<input id="vk-pres-ev" name="evidence" maxlength="300" autocomplete="off" placeholder="A file name or reference"></label>
+      <p class="hint">${esc(SIM_NOTE)}${x.secondary ? esc(' A ' + x.secondary + ' then closes it as secondary reviewer.') : ''}</p>`,
+    'Resolve as the platform team', (fd) => {
+      const action = String(fd.action || '').trim();
+      if (!action) return 'Write what the platform team did.';
+      return finish(ENGINE.resolve(x, ACTOR.platform(x.owner), { action, evidence: String(fd.evidence || '').trim() || null }), 'Resolved ' + x.id + ' (' + x.code + ') as the simulated ' + x.owner + '.');
+    });
+  }
+  function actPlatClose(t) {
+    const x = ENGINE.exById(t.dataset.ex);
+    if (!x || !isPlatform(x.secondary)) { toast('That exception is no longer here.'); render(); return; }
+    const c = x.caseId ? ENGINE.caseById(x.caseId) : null;
+    modal('Close ' + x.id + ' as the simulated platform team', `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
+      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Secondary reviewer', esc(x.secondary + ' (simulated platform team)')], ['Resolved by', esc(x.resolvedBy || '')], ['What was done', esc(scrub(x.resolution || ''))]])}
+      <label class="f" for="vk-pclose-note">Review note (optional)<input id="vk-pclose-note" name="note" maxlength="300" autocomplete="off"></label>
+      <p class="hint">${esc(SIM_NOTE)}</p>`,
+    'Close as the platform team', (fd) => finish(ENGINE.close(x, ACTOR.platform(x.secondary), { note: String(fd.note || '').trim() }), 'Closed ' + x.id + ' (' + x.code + ') as the simulated ' + x.secondary + '.'));
+  }
+  Object.assign(ACT, { 'vk.release': actRelease, 'vk.resolve': actResolve, 'vk.close': actClose, 'vk.platResolve': actPlatResolve, 'vk.platClose': actPlatClose });
 
   // Buttons for the shared actions. A row from waitingGates() or myExceptions() picks the right one; locked buttons say why.
   function releaseBtn(row) {
@@ -313,15 +350,26 @@ const VK = (() => {
     const data = { case: row.c.id, gate: row.g }; if (row.tx) data.tx = row.tx.id;
     return btn(label, 'vk.release', { cls: 'sm' + (row.ready ? ' primary' : ''), data, title: row.ready ? '' : row.why });
   }
+  // Resolve, or Close as the secondary reviewer. Only the role that may act gets a live button; everyone else sees a lock saying
+  // who acts. Platform-owned codes get the simulated platform team's button instead (any role may press it; ENGINE records the
+  // platform actor).
   function exceptionBtn(row) {
     const x = row.x; const a = ACTOR.me();
     if (row.need === 'close') {
-      return btn('Close', 'vk.close', { cls: 'sm', data: { ex: x.id }, lock: x.resolvedById === a.id ? 'You resolved it; someone else closes it' : null });
+      if (x.status !== 'resolved') return '';
+      if (!x.secondary) return `<span class="lock">${I.hourglass}${esc('Closes by itself when its gates are done')}</span>`;
+      if (isPlatform(x.secondary)) return btn('Close as the simulated platform team', 'vk.platClose', { cls: 'sm', data: { ex: x.id }, title: 'The ' + x.secondary + ' closes it; the preview simulates the platform team' });
+      const lock = x.secondary !== a.role ? 'Closed by the ' + x.secondary : (x.resolvedById === a.id ? 'You resolved it; someone else closes it' : null);
+      return btn('Close', 'vk.close', { cls: 'sm', data: { ex: x.id }, lock });
+    }
+    const guard = ENGINE.resolveGuard(x.caseId ? ENGINE.caseById(x.caseId) : null, x);
+    if (isPlatform(x.owner)) {
+      if (guard) return `<span class="lock">${I.hourglass}${esc(scrub(guard))}</span>`;
+      return btn('Resolve as the simulated platform team', 'vk.platResolve', { cls: 'sm', data: { ex: x.id }, title: 'The ' + x.owner + ' resolves it; the preview simulates the platform team' });
     }
     const whoWhy = ENGINE.resolverCheck(x, a);
     if (whoWhy) return `<span class="lock">${I.lock}${esc(whoWhy)}</span>`;
-    const guard = ENGINE.resolveGuard(x.caseId ? ENGINE.caseById(x.caseId) : null, x);
-    if (guard) return `<span class="lock">${I.hourglass}${esc(guard)}</span>`;
+    if (guard) return `<span class="lock">${I.hourglass}${esc(scrub(guard))}</span>`;
     return btn('Resolve', 'vk.resolve', { cls: 'sm', data: { ex: x.id } });
   }
 

@@ -7,9 +7,9 @@
     const rows = VK.waitingGates(role);
     const ready = rows.filter((r) => r.ready).length;
     const status = (r) => {
-      if (r.ready) return `${VK.pill(r.kind === 'g18' ? 'Your sign-off is next' : 'Ready for you', 'ok')}${r.note ? `<div class="small muted">${esc(r.note)}</div>` : ''}`;
+      if (r.ready) return `${VK.pill(r.kind === 'g18' ? 'Your sign-off is next' : 'Ready for you', 'ok')}${r.note ? `<div class="small muted">${esc(VK.scrub(r.note))}</div>` : ''}`;
       const codes = r.blockers.length ? `<div class="vk-codes">${r.blockers.map((x) => VK.codeChip(x.code, x) + VK.sevChip(x.sev, { short: true })).join(' ')}</div>` : '';
-      const miss = r.blockers.length ? '' : `<div class="small">${esc(r.why.replace(/^Not ready: /, ''))}</div>`;
+      const miss = r.blockers.length ? '' : `<div class="small">${esc(VK.scrub(r.why.replace(/^Not ready: /, '')))}</div>`;
       return `${VK.pill(r.blockers.length ? 'Blocked' : 'Waiting', r.blockers.length ? 'bad' : 'warn')}${codes}${miss}`;
     };
     const table = VK.table([{ label: 'Gate' }, { label: 'Case' }, { label: 'What it approves' }, { label: 'Status' }, { label: '', cls: 'vk-act' }],

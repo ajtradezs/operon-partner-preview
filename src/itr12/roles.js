@@ -23,7 +23,7 @@ const ME_BY_ROLE = { 'Tax Consultant': 'TC1', Administrator: 'AD1', 'Integration
 const SOD = [
   { id: 'sod-g18', text: 'G18 needs two different people: the Integration Administrator and the substantive gate owner (the Tax Consultant).' },
   { id: 'sod-override', text: 'An override is approved by the Records/Compliance Owner, who must not be the person who asked for it.' },
-  { id: 'sod-severity', text: 'Lowering an S1 or S2 severity is approved by the Records/Compliance Owner, who must not be the person who asked for it.' },
+  { id: 'sod-severity', text: 'Lowering an S1 or S2 severity, or the severity of any code the register marks blocking, is approved by the Records/Compliance Owner, who must not be the person who asked for it. Only the code’s owner may ask to lower a blocking code. A severity change never changes whether the code blocks.' },
   { id: 'sod-secondary', text: 'Where the register names a secondary reviewer, a different person from the resolver closes the exception.' },
   { id: 'sod-g09', text: 'Only a human Tax Consultant can release G09. No system or AI may approve it.' },
   { id: 'sod-portal', text: 'The client gates (G03, G06 and G14) pass only through the client’s own PaperSync portal action, and G07 (version freeze) only through Operon itself.' },

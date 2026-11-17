@@ -19,7 +19,9 @@ STAGES = {
     "ready": ("G18", []),
     "unknown": ("G18", ["INT-04"]),
     "declaration": ("G10", ["DA-01", "DA-05"]),
-    "verification": ("G11", ["VRF-01", "VRF-05"]),
+    # VRF-03 is new (review finding M2): the deadline watcher now runs every morning, so it raises VRF-03 on 28 Oct, 10 business
+    # days before the 12 Nov due date, and the pack is still not uploaded on the demo day.
+    "verification": ("G11", ["VRF-01", "VRF-03", "VRF-05"]),
     "assessment": ("G12", ["ASM-02"]),  # the register maps ASM-02 to G12 only: the ITA34 check waits; G13 (the review) is next
     "remedy": ("G15", ["CLT-07", "REM-05"]),
     "closed": ("G16", []),
@@ -117,6 +119,26 @@ def test_audit_trail_is_chronological_and_verifies(page):
     assert r["n"] > 100
     assert r["back"] == 0, r
     assert r["chain"]["ok"], r["chain"]
+
+
+def test_deadline_warnings_arrive_in_the_window_the_deadlines_screen_names(page):
+    """Review finding M2: the watcher runs every morning of the replayed history, so each warning is raised on the first morning
+    inside the warnDays window (10 business days), not on the demo day."""
+    r = page.evaluate("""() => {
+      const pick = (code, key) => S.audit.find((a) => a.code === code && a.result === 'Raised' && a.caseId === DEMO.keys[key]);
+      const at = (a) => a && DATES.iso(DATES.fromLocal(new Date(a.at))) + ' ' + new Date(a.at).toTimeString().slice(0, 5);
+      const vrf = pick('VRF-03', 'verification'); const da = pick('DA-05', 'declaration'); const pre = pick('PRE-04', 'declaration');
+      return { vrf: at(vrf), vrfText: vrf && vrf.text, da: at(da), daText: da && da.text, pre: at(pre),
+        preClosed: ENGINE.exOf(ENGINE.caseById(DEMO.keys.declaration)).filter((x) => x.code === 'PRE-04').map((x) => x.status),
+        warnDays: S.policy.warnDays,
+        watches: S.audit.filter((a) => a.code === 'VRF-03' && a.result === 'Raised').length };
+    }""")
+    assert r["warnDays"] == 10
+    assert r["vrf"] == "2026-10-28 07:00", ("VRF-03: 10 business days before the 12 Nov due date", r)
+    assert "10 business days left to 12 Nov 2026" in r["vrfText"], r["vrfText"]
+    assert r["da"] == "2026-11-04 07:00", ("DA-05: the first morning after the 3 Nov questionnaire (due 17 Nov)", r)
+    assert r["pre"] == "2026-10-09 07:00" and r["preClosed"] == ["closed"], ("PRE-04 before the 23 Oct deadline, resolved before filing", r)
+    assert r["watches"] == 1, "A warning is raised once per deadline"
 
 
 def test_the_clock_keeps_running_after_the_seed(page):

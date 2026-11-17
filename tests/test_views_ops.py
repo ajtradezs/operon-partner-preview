@@ -177,9 +177,12 @@ def test_severity_request_and_approval(page):
     page.wait_for_function("id => ENGINE.exById(id).sev === 'S3'", arg=x)
     assert page.evaluate("id => S.audit.some((a) => a.exceptionId === id && a.who === 'RC1' && a.after === 'S3')", x)
 
-    # The approver may not approve a lowering they asked for themselves: the refusal reason is shown.
-    y = page.evaluate("ENGINE.exOf(ENGINE.caseById(DEMO.keys.judgement)).find((z) => z.code === 'TAX-02').id")
-    page.evaluate("id => ENGINE.setSeverity(ENGINE.exById(id), ACTOR.me(), 'S3', { reason: 'test' })", y)
+    # The approver may not approve a lowering they asked for themselves: the refusal reason is shown. Only a blocking code's owner may
+    # ask, so the Records/Compliance Owner asks on a code it owns (RET-05, S2) raised by hand on the case.
+    show(page, "Records/Compliance Owner", "exceptions")
+    y = page.evaluate("""() => { const r = ENGINE.raiseManual(ENGINE.caseById(DEMO.keys.judgement), 'RET-05', ACTOR.me(), { note: 'test' });
+        const q = ENGINE.setSeverity(r.exception, ACTOR.me(), 'S3', { reason: 'test' }); return q.ok && q.pending ? r.exception.id : null; }""")
+    assert y
     show(page, "Records/Compliance Owner", "exception-" + y)
     click(page, "[data-rv-key='ops-exception-severity'] button[data-act='ops.sevOk'][data-v='1']")
     page.wait_for_function("document.getElementById('toasts').textContent.includes('Not done: The approver must not be the person who asked')")

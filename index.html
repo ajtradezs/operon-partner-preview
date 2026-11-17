@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-build="20261117T074626Z"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="description" content="Operon partner preview: the ITR12 workflow with made-up data and simulated logins.">
+<html lang="en" data-build="20261117T112506Z"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="description" content="Operon partner preview: the ITR12 workflow with made-up data and simulated logins.">
 <title>Operon · ITR12 partner preview</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -707,10 +707,22 @@ body.rv-arranging .cb-card{cursor:default}
 .cs-21-bar{height:8px;border-radius:999px;background:var(--op-surface-2);border:1px solid var(--op-rule);overflow:hidden}
 .cs-21-bar>span{display:block;height:100%;background:var(--op-accent)}
 .vk-sec dl.facts dd{min-width:0;overflow-wrap:anywhere}
+/* Gate checklist items with their tick, the values form and the remedy chooser */
+.vk-row.cs-req{grid-template-columns:auto minmax(0,1fr) auto;align-items:center}
+.cs-reqact{justify-self:end}
+.cs-reqact .locked{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.cs-vals{display:flex;flex-direction:column;gap:10px}
+.cs-val{border:1px solid var(--op-rule);border-radius:8px;padding:8px 10px;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:8px}
+.cs-val legend{padding:0 4px}
+.cs-val-med{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:8px}
+.cs-remedy{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:6px}
 
 @media (max-width:760px){
   .cb-cols{grid-template-columns:minmax(0,1fr)}
   .cb-last{flex-wrap:wrap}
+  .vk-row.cs-req{grid-template-columns:auto minmax(0,1fr)}
+  .cs-reqact{grid-column:1 / -1;justify-self:start}
+  .cs-reqact .locked{align-items:flex-start}
   .vk-cards tr.cs-now{background:var(--op-accent-soft)}
   .vk-cards tr.cs-now td,.vk-cards tr.cs-diff td{background:transparent}
   .vk-cards tr.cs-diff{background:var(--op-warning-soft)}
@@ -761,6 +773,8 @@ body.rv-arranging .cb-card{cursor:default}
 .ops-radios legend{margin-bottom:6px}
 .ops-radios label{display:flex;gap:10px;align-items:flex-start;font-size:14px}
 .ops-radios input{margin-top:3px;flex:none}
+/* The simulated ITA34: which figure differs and SARS's amount, side by side when there is room */
+.ops-ita-diff{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:8px}
 
 @media (max-width:760px){
   .ops-btns,.vk-tablewrap td.vk-act .ops-btns{justify-content:flex-start;max-width:none}
@@ -922,6 +936,15 @@ body.rv-arranging .cb-card{cursor:default}
 .ps-check{display:flex;align-items:flex-start;gap:8px;font-weight:600;font-size:14px;cursor:pointer}
 .ps-check input{margin-top:3px;flex:none}
 .ps-verify{display:flex;flex-direction:column;gap:10px;max-width:440px}
+/* The client review package (step 13): one disclosure per part, so the declaration below stays in reach. */
+.ps-pack{display:flex;flex-direction:column;gap:6px;margin:10px 0 12px;min-width:0}
+.ps-pack-i{border:1px solid var(--op-rule);border-radius:8px;background:var(--op-surface);min-width:0}
+.ps-pack-i>summary{cursor:pointer;padding:9px 12px;font-weight:600;font-size:14px}
+.ps-pack-i[open]>summary{border-bottom:1px solid var(--op-rule)}
+.ps-pack-b{padding:10px 12px;font-size:14px;line-height:1.5;overflow-wrap:anywhere;min-width:0}
+.ps-pack-b p{margin:0 0 6px}
+.ps-pack-b p:last-child{margin-bottom:0}
+.ps-now .vk-when{font-weight:600}
 
 /* Try it */
 .ps-try p{font-size:14px}
@@ -1175,8 +1198,8 @@ function viewSignIn() {
     return `<section class="signin"><div class="signin-card">${logo}<div class="card"><form data-form="code" class="stack" novalidate>
       <h1 class="sr">Simulated two-step sign-in</h1>
       <p>Signing in as <strong>${esc(S.authEmail)}</strong>.</p>
-      <label class="f" for="si-code">Simulated code · enter 123456<input id="si-code" name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></label>
-      <p class="hint">Demo: any 6 digits work. In the real app this is your authenticator code.</p>
+      <label class="f" for="si-code">Simulated code (any 6 digits, such as 123456)<input id="si-code" name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></label>
+      <p class="hint">In the real app this is your authenticator code.</p>
       <p class="err" id="si-err" role="alert"></p>
       <div class="row between"><button type="button" class="btn ghost" data-act="authBack">Back</button><button class="btn primary" type="submit">Sign in</button></div>
     </form></div></div></section>`;
@@ -1185,7 +1208,7 @@ function viewSignIn() {
     <h1 style="font-size:1.25rem">Sign in to ${esc(FIRM)}</h1>
     <label class="f" for="si-email">Work email<input id="si-email" name="email" type="email" autocomplete="off" placeholder="roelof.demo@example.test" value="${esc(S.authEmail)}"></label>
     <label class="f" for="si-role">See the preview as<select id="si-role" name="role">${ROLES.map((r) => `<option${r === S.role ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
-    <p class="hint">Simulation only. Use aidan.demo@example.test, johan.demo@example.test or roelof.demo@example.test, then code 123456. No password or real authenticator is needed. You can switch role in the header. Clients never sign in here: they act through the PaperSync portal.</p>
+    <p class="hint">Simulation only. Any email address works (for example roelof.demo@example.test), then any 6 digits as the code (such as 123456). No password or real authenticator is needed. You can switch role in the header. Clients never sign in here: they act through the PaperSync portal.</p>
     <p class="err" id="si-err" role="alert"></p>
     <button class="btn primary" type="submit">Continue</button>
   </form></div></div></section>`;
@@ -1282,8 +1305,8 @@ function stepUp(why, then) {
   if (Date.now() < S.stepUpUntil) { then(); return; }
   modal('Confirm it’s you', `<p>${esc(why)}</p>
     <label class="f" for="su-pw">Password<input id="su-pw" name="pw" type="password" autocomplete="off"></label>
-    <label class="f" for="su-code">Simulated code · enter 123456<input id="su-code" name="code" inputmode="numeric" maxlength="6" class="code" autocomplete="off"></label>
-    <p class="hint">Demo: any password and any 6 digits work. You won’t be asked again for 5 minutes.</p>`, 'Confirm', (fd) => {
+    <label class="f" for="su-code">Simulated code (any 6 digits, such as 123456)<input id="su-code" name="code" inputmode="numeric" maxlength="6" class="code" autocomplete="off"></label>
+    <p class="hint">Demo: any password works. You won’t be asked again for 5 minutes.</p>`, 'Confirm', (fd) => {
     if (!String(fd.pw || '').length) return 'Enter your password. Any password works in the demo.';
     if (!/^\d{6}$/.test(String(fd.code || '').trim())) return 'Enter the 6-digit code. Any 6 digits work in the demo.';
     S.stepUpUntil = Date.now() + 5 * 60000;
@@ -2358,12 +2381,26 @@ const POLICY_PENDING = ['overridable', 'warnDays', 'materiality', 'aiConfidence'
 /* ---------- Exception handling rules ---------- */
 // No override may bypass a statutory restriction, missing taxpayer authority, a security control or SARS-interface authorisation.
 const NEVER_OVERRIDE = {
-  authority: ['CLT-04', 'CLT-06', 'PRE-03', 'SUB-05'],
-  security: ['DOC-04', 'DOC-10'],  // plus every SEC-* code
+  authority: [
+    'KYC-04',  // the client refuses or cannot give the mandate or engagement information: no authority to act
+    'KYC-05',  // the appointment letter and mandate are unsigned, incomplete or out of scope: no authority to act
+    'CLT-04',  // the client withholds authority to submit
+    'CLT-06',  // the client withdraws approval or authority
+    'PRE-03',  // no valid client authority for the version being submitted
+    'SUB-05',  // a submission after the client withdrew authority
+  ],
+  security: ['DOC-04', 'DOC-10'],  // another taxpayer's document; an unsafe file. Plus every SEC-* code (families below)
+  statutory: [
+    'KYC-06',  // POPIA privacy notice and consent incomplete: a statutory restriction on processing personal information
+  ],
+  sarsInterface: [
+    'MD-06',   // the taxpayer identity or tax-reference link the SARS interface relies on fails (it maps to G18)
+  ],
   families: { SEC: 'a security control', INT: 'SARS-interface authorisation', RET: 'a statutory hold' },
 };
-// Resolved only by the client's own PaperSync portal action (fresh, explicit, version-specific approval).
-const PORTAL_ONLY = ['CLT-02', 'CLT-04', 'CLT-05', 'CLT-06'];
+// Resolved only by the client's own PaperSync portal action (fresh, explicit, version-specific approval). CLT-02 is not here: the
+// register makes the Tax Consultant its owner, who resolves it once the concern is investigated (and a revised pack issued if needed).
+const PORTAL_ONLY = ['CLT-04', 'CLT-05', 'CLT-06'];
 // Codes whose resolution criterion is the approval (and, where there is one, the SARS submission) of their own gate.
 // They mark which gates must be passed (again) instead of blocking them; passing those gates closes them.
 const BY_GATE = ['DA-01', 'VRF-01', 'AUD-02', 'VRF-04', 'AUD-03', 'REM-02', 'REM-03', 'REM-04', 'REM-05', 'REM-06', 'REM-08', 'SUB-04', 'CLT-07'];
@@ -2424,6 +2461,11 @@ const DOC_KINDS = [
   { kind: 'foreign', label: 'Foreign income statement', rx: /foreign|offshore/i },
   { kind: 'bank', label: 'Bank confirmation letter', rx: /bank conf|bank letter|bank statement/i },
   { kind: 'notice', label: 'SARS notice or letter', rx: /sars|notice|letter/i },
+  // Added for the step 5 questionnaire areas (trade or business, trust distributions, pension or annuity income, disability).
+  { kind: 'business', label: 'Business income and expense records', rx: /business|self.?employ|trading/i },
+  { kind: 'trust', label: 'Trust distribution statement', rx: /trust/i },
+  { kind: 'pension', label: 'Pension or annuity income certificate', rx: /pension/i },
+  { kind: 'disability', label: 'Confirmation of disability (ITR-DD)', rx: /itr.?dd|disab/i },
 ];
 
 /* ---------- Choices and gaps put to Johan (shown on the Controls page). The register wins where his files differ. ---------- */
@@ -2443,6 +2485,16 @@ const PENDING_JOHAN = [
   { id: 'q-ret', topic: 'Retention holds', text: 'The register raises RET-01 and RET-02 when retention expires while a verification, audit or dispute is still open. The preview records the hold when that process starts (TAA s32) and raises the RET code at the review date if the hold is still active.' },
   { id: 'q-da-name', topic: 'Declaration Alert', text: 'The documents say “Declaration Alert”. SARS’s eFiling guide (IT-AE-36-G06) calls it the “Declaration Questionnaire” and its filing-season 2026 page the “Alert Declaration questionnaire”. The preview uses Johan’s term. The guide says the questionnaire stays open for 24 working hours; the preview takes the response due date from the SARS notice and shows that window beside it.' },
   { id: 'q-multi-gate', topic: 'Codes mapped to several gates', text: 'QUE-03 (G03, G05), MD-04 (G02, G05), DOC-09 (G04, G05), CLT-03 (G05 to G07) and VER-03 (G07, G09) block every gate they are mapped to, so while one is open the earliest of those gates cannot pass, even where its resolution (for example “technical treatment is approved”) belongs to a later step. The preview has the owner resolve it at the earliest gate; the later gates then re-check the outcome through their own criteria.' },
+  { id: 'q-g10-da04', topic: 'G10 box vs register', text: 'The document’s G10 box lists DA-04 (“routed to verification”); the register maps DA-04 to G11 only. The preview follows the register for the exception. It follows the G10 box (“or move to verification”) for the gate: once SARS moves the questionnaire to verification, G10 passes without a response.' },
+  { id: 'q-conditional', topic: '“Conditional” blocking', text: 'The register marks AI-06, INT-03, INT-13 and INT-15 “Conditional” but does not say what the condition is. The preview reads it as: the code blocks its gates until the service is restored or a retry succeeds, or until a manual fallback is recorded by one person and reconciled by a different person. Other readings are possible: it could block only while the service is down, never block once a fallback is recorded, or block only for some transactions. Which does Johan mean?' },
+  { id: 'q-standins', topic: 'Who may resolve for the client, the AI or the system', text: 'Client-owned codes (QUE-01, QUE-02, QUE-04, DOC-01, DOC-03, DOC-07, DA-02, VRF-02, ASM-04, REM-07) may also be recorded as resolved by the Tax Consultant or the Administrator. DOC-05 (owner: AI Agent) and PRE-02 (owner: the system) may be resolved by the Tax Consultant.' },
+  { id: 'q-s3-gate', topic: 'S3 codes that block', text: 'The Instructions sheet says S3 holds the affected item while unrelated work continues. The Gate Map says a gate cannot be released while a blocking mapped exception is open. The preview follows the Gate Map: an S3 code marked Blocking = Yes stops every gate it is mapped to, not only the item.' },
+  { id: 'q-never-override', topic: 'Codes that may never be overridden', text: 'Missing taxpayer authority: KYC-04, KYC-05, CLT-04, CLT-06, PRE-03 and SUB-05. Security controls: DOC-04, DOC-10 and every SEC code. Statutory restrictions: KYC-06 (POPIA) and every RET code (statutory holds). SARS-interface authorisation: MD-06 and every INT code. The preview never offers these for override. Is the list complete?' },
+  { id: 'q-ai-lower', topic: 'The AI and severity', text: 'The document stops the AI lowering an S1 or S2 severity. The preview goes further: the AI may raise any severity but may not lower any, including S3 to S4.' },
+  { id: 'q-severity-blocking', topic: 'Severity and blocking', text: 'The register keeps Severity and Blocking as separate columns. In the preview a severity change never changes Blocking: a code the register marks blocking still blocks at S4. Only the code’s owner may ask to lower the severity of a blocking code, and the Records/Compliance Owner (a different person) approves it.' },
+  { id: 'q-g01-master', topic: 'What G01 checks', text: 'G01 checks the six KYC items on the client record. It does not check the Phase 1 client master fields. Which of those fields are mandatory before G01 can pass is Johan’s call.' },
+  { id: 'q-g01-scope', topic: 'G01 and G02 on each annual case', text: 'The document makes KYC (G01) and the SARS details check (G02) client-level, and creates the annual case after G02. The preview opens the annual case first and tracks G01 and G02 on it, so a returning client goes through them again each year.' },
+  { id: 'q-engagement', topic: 'Engagement terms', text: 'G01 asks for “Engagement terms accepted” as well as the five Phase 2 items. The signed appointment letter and mandate already cover scope, responsibilities and fees. Does Johan want separate engagement terms, or should the item go?' },
 ];
 
 /* ===================== itr12/roles.js ===================== */
@@ -2471,7 +2523,7 @@ const ME_BY_ROLE = { 'Tax Consultant': 'TC1', Administrator: 'AD1', 'Integration
 const SOD = [
   { id: 'sod-g18', text: 'G18 needs two different people: the Integration Administrator and the substantive gate owner (the Tax Consultant).' },
   { id: 'sod-override', text: 'An override is approved by the Records/Compliance Owner, who must not be the person who asked for it.' },
-  { id: 'sod-severity', text: 'Lowering an S1 or S2 severity is approved by the Records/Compliance Owner, who must not be the person who asked for it.' },
+  { id: 'sod-severity', text: 'Lowering an S1 or S2 severity, or the severity of any code the register marks blocking, is approved by the Records/Compliance Owner, who must not be the person who asked for it. Only the code’s owner may ask to lower a blocking code. A severity change never changes whether the code blocks.' },
   { id: 'sod-secondary', text: 'Where the register names a secondary reviewer, a different person from the resolver closes the exception.' },
   { id: 'sod-g09', text: 'Only a human Tax Consultant can release G09. No system or AI may approve it.' },
   { id: 'sod-portal', text: 'The client gates (G03, G06 and G14) pass only through the client’s own PaperSync portal action, and G07 (version freeze) only through Operon itself.' },
@@ -2959,7 +3011,8 @@ const CALC = (() => {
    change is written to the hash-chained audit trail. The AI checks and the SARS link are simulated and labelled as such.
 
    Actors: ACTOR.me(), as(role, personId), client(clientId), ai(), reviewer(), system(), platform(role), sars().
-   Actions return { ok, why, ... } and audit every refusal. The main ones:
+   Actions return { ok, why, ... } and audit every authorisation and gate refusal; malformed input (an unknown key or code, a bad
+   date format) and no-ops return fail() without an audit entry. The main ones:
      newClient(o) newCase(client, o) addItem(c, kind, label) setKyc(client, key, ok, a) markReq(c, gate, key, a)
      release(c, gate, a, o) canRelease(c, gate, a, o) gateState(c, gate) drive(c, untilGate, o)
      raise(c, code, o) raiseManual(c, code, a, o) resolve(x, a, o) close(x, a, o) setSeverity(x, a, to, o) approveSeverity(x, a, o)
@@ -3030,6 +3083,11 @@ const ENGINE = (() => {
   const itr12InFlight = (c) => S.txs.find((t) => t.caseId === c.id && t.fn === 'itr12' && IN_FLIGHT.includes(t.status)) || null;
   const currentApproval = (c) => !!(c.approval && !c.approval.withdrawn && !c.approval.superseded);
   const validDay = (s) => (typeof s === 'string' && DATES.dt(s) ? s : null);
+  // A YYYY-MM-DD day as people read it ('12 Nov 2026'), for audit texts.
+  const dayText = (s) => { const d = validDay(s) && DATES.dt(s); return d ? fDate(DATES.toLocal(d)) : String(s); };
+  // Money as the rest of the app shows it (calc.js), e.g. '−R97,155.00'.
+  const money = (n) => (typeof CALC !== 'undefined' ? CALC.rand(n) : R(n));
+  const colLabel = (k) => { const col = BOARD.find((x) => x.key === k); return col ? col.label : k; };
 
   /* ===================== Audit ===================== */
   // Client and simulated platform actions are human actions; SARS events are recorded as system events.
@@ -3091,21 +3149,30 @@ const ENGINE = (() => {
     { key: 'travel', label: 'Did you receive a travel allowance?', kind: 'logbook' },
     { key: 'homeoffice', label: 'Did you work from a home office?', kind: 'homeoffice' },
     { key: 'donations', label: 'Did you make section 18A donations?', kind: 'donation' },
+    // The other step 5 areas. The new ones that change the shape of the return are material: new this year, they raise QUE-03.
+    { key: 'pension', label: 'Did you receive a pension or annuity?', kind: 'pension', material: true },
+    { key: 'business', label: 'Did you run a trade or business, or work for yourself?', kind: 'business', material: true },
+    { key: 'trust', label: 'Did you receive a distribution from a trust?', kind: 'trust', material: true },
+    { key: 'disability', label: 'Do you, your spouse or a dependant have a disability?', kind: 'disability' },
+    { key: 'other', label: 'Any other income or deductions, or any material change since last year?', material: true },
   ];
   const kindLabel = (k) => { const d = DOC_KINDS.find((x) => x.kind === k); return d ? d.label : k; };
   // A clean file name per document kind (used by drive() and the demo's "upload a sample" buttons).
   const FILE_FOR = { irp5: 'IRP5_2026.pdf', it3b: 'IT3b_interest_2026.pdf', it3c: 'IT3c_capital_gains_2026.pdf', medical: 'Medical_scheme_certificate_2026.pdf',
     ra: 'RA_certificate_2026.pdf', rental: 'Rental_schedule_2026.pdf', logbook: 'Logbook_2026.pdf', homeoffice: 'Home_office_expenses_2026.pdf',
-    donation: 'Section18A_receipt_2026.pdf', foreign: 'Foreign_income_statement_2026.pdf', bank: 'Bank_confirmation_2026.pdf', notice: 'SARS_notice_2026.pdf' };
+    donation: 'Section18A_receipt_2026.pdf', foreign: 'Foreign_income_statement_2026.pdf', bank: 'Bank_confirmation_2026.pdf', notice: 'SARS_notice_2026.pdf',
+    business: 'Business_income_and_expenses_2026.pdf', trust: 'Trust_distribution_2026.pdf', pension: 'Pension_certificate_2026.pdf', disability: 'ITR-DD_disability_2026.pdf' };
 
   // a: the person adding the client (an Administrator). The seed and the engine's own walk-through pass none (the system).
   function newClient(o, a) {
     o = o || {};
     if (a) { const w = staffWhy(a, 'Administrator'); if (w) return refuse(a, null, 'Adding a client refused', w); }
     const kyc = KYC_ITEMS.map((k) => ({ key: k.key, label: k.label, ok: o.kyc && k.key in o.kyc ? !!o.kyc[k.key] : true }));
-    // The default ID number deliberately fails the SA ID checksum: every identity in the preview is made up.
-    const cl = { id: nextId('clientN', 'CL', 2), name: o.name || 'Demo Client', idNo: o.idNo || '8001015009088', taxRef: o.taxRef || '0123456789',
+    // The default ID number deliberately fails the SA ID checksum: every identity in the preview is made up. It is used only when
+    // no idNo is given at all; idNo: null (or '') is a client without an RSA ID (passport only), and calc.js then asks for the date of birth.
+    const cl = { id: nextId('clientN', 'CL', 2), name: o.name || 'Demo Client', idNo: o.idNo === undefined ? '8001015009088' : (o.idNo || null), taxRef: o.taxRef || '0123456789',
       provisional: o.provisional !== false, others: (o.others || []).slice(), kyc, email: o.email || null };
+    if (o.dob) cl.dob = String(o.dob);
     if (o.master && typeof o.master === 'object') cl.master = Object.assign({}, o.master);
     S.clients.push(cl);
     log(a || ACTOR.system(), 'Added client ' + cl.id + ' to the permanent client repository', { client: cl.id });
@@ -3307,7 +3374,7 @@ const ENGINE = (() => {
     }
     const st = c.gates[g]; const before = st.status;
     Object.assign(st, { status: 'released', by: [whoOf(a)], byType: a.type, at: now(), version: vN(c), rework: null, routed: false, via: a.via || null });
-    log(a, 'Released ' + g + ': ' + GATE[g].control, Object.assign(cf(c), { gate: g, before, after: 'released', result: 'Released', evidence: o.evidence || '' }));
+    log(a, 'Released ' + g + ': ' + GATE[g].control, Object.assign(cf(c), { gate: g, before, after: 'released', result: 'Released', evidence: o.evidence || '' }, o.sarsRef ? { sarsRef: o.sarsRef } : {}));
     onReleased(c, g, a);
     settle(c);
     return r;
@@ -3317,6 +3384,12 @@ const ENGINE = (() => {
     else if (g === 'G09') { const t = newTx(c, 'itr12', a); c.subTx = t.id; }
     else if (g === 'G10') { if (daMoved(c)) log(ACTOR.system(), 'G10 passed without a response: SARS moved the Declaration Questionnaire to verification', Object.assign(cf(c), { gate: 'G10' })); else newTx(c, 'da', a); }
     else if (g === 'G11') newTx(c, 'vrf', a);
+    else if (g === 'G13') {
+      // The G13 box, on pass: "Release assessment package to client". Only now is the client told (step 24).
+      c.assessmentPack = { at: now(), ita34: c.ita34 ? { ref: c.ita34.ref, date: c.ita34.date } : null };
+      log(ACTOR.system(), 'Released the assessment package to the client in the PaperSync portal (simulated)' + (c.ita34 ? ': ITA34 ' + c.ita34.ref + ' dated ' + dayText(c.ita34.date) : ''),
+        Object.assign(cf(c), { gate: 'G13', sarsRef: c.ita34 ? c.ita34.ref : null, result: 'Sent' }));
+    }
     else if (g === 'G15' && c.remedy.route !== 'advice') {
       const f = SARS_FN[c.remedy.route];
       const t = newTx(c, c.remedy.route, a, { status: f.approved ? 'awaiting G18' : 'blocked' });
@@ -3613,11 +3686,13 @@ const ENGINE = (() => {
     log(ACTOR.system(), 'Validated ' + d.name + ' after its exceptions were cleared', Object.assign(cf(c), { doc: d.id }));
   }
 
-  /* ---------- Severity: staff, the AI and the system may raise it; only a person may lower it; lowering S1/S2 needs the Records/Compliance Owner ---------- */
+  /* ---------- Severity: staff, the AI and the system may raise it; only a person may lower it. Lowering S1/S2, or any code the
+     register marks blocking, needs the Records/Compliance Owner; only the code's owner may ask to lower a blocking code.
+     The register rules: Severity and Blocking are separate columns, so a severity change never changes x.blocking. ---------- */
+  const lowerNeedsApproval = (x) => x.sev === 'S1' || x.sev === 'S2' || CODE[x.code].blocking !== 'No';
   function applySeverity(x, to, a, note, viaRequest) {
-    const c = caseOf(x); const from = x.sev; const def = CODE[x.code];
+    const c = caseOf(x); const from = x.sev;
     x.sev = to; x.severity = SEV_LABEL[to]; x.humanApproval = to === 'S1' || to === 'S2';
-    if (to === 'S4') x.blocking = 'No'; else if (from === 'S4') x.blocking = def.blocking === 'No' ? 'Yes' : def.blocking;
     // A pending lowering request was for the old severity; it lapses when the severity moves another way.
     if (!viaRequest && x.sevRequest && x.sevRequest.status === 'pending') {
       x.sevRequest.status = 'lapsed'; x.sevRequest.lapsedAt = now();
@@ -3638,7 +3713,9 @@ const ENGINE = (() => {
     if (raising) { applySeverity(x, to, a, o.reason); return okr(); }
     if (a.type !== 'human') return refuse(a, c, 'Lowering ' + x.id + ' refused', 'Only a person may lower a severity; the AI may only raise it', audit);
     const reason = String(o.reason || '').trim(); if (!reason) return refuse(a, c, 'Lowering ' + x.id + ' refused', 'Give the reason for lowering the severity', audit);
-    if (x.sev === 'S1' || x.sev === 'S2') {
+    const regBlocking = CODE[x.code].blocking !== 'No';
+    if (regBlocking && a.role !== x.owner) return refuse(a, c, 'Lowering ' + x.id + ' refused', 'The register marks ' + x.code + ' blocking, so only its owner (' + x.owner + ') may ask to lower its severity', audit);
+    if (lowerNeedsApproval(x)) {
       x.sevRequest = { from: x.sev, to, by: a.id, role: a.role, reason, at: now(), status: 'pending' };
       log(a, 'Asked to lower ' + x.id + ' (' + x.code + ') from ' + x.sev + ' to ' + to + ': ' + reason + '. Needs the Records/Compliance Owner’s approval.',
         Object.assign(cf(c), audit, { before: x.sev, after: to, reason, result: 'Requested' }));
@@ -3668,6 +3745,8 @@ const ENGINE = (() => {
     if (!d) return 'Unknown code ' + code;
     if (NEVER_OVERRIDE.authority.includes(code)) return 'No override may bypass missing taxpayer authority (' + code + ')';
     if (NEVER_OVERRIDE.security.includes(code)) return 'No override may bypass a security control (' + code + ')';
+    if (NEVER_OVERRIDE.statutory.includes(code)) return 'No override may bypass a statutory restriction (' + code + ')';
+    if (NEVER_OVERRIDE.sarsInterface.includes(code)) return 'No override may bypass SARS-interface authorisation (' + code + ')';
     const fam = code.split('-')[0];
     if (NEVER_OVERRIDE.families[fam]) return 'No override may bypass ' + NEVER_OVERRIDE.families[fam] + ' (' + code + ')';
     if (d.sev !== 'S2') return 'Only S2 codes can be put on the override list';
@@ -4087,8 +4166,10 @@ const ENGINE = (() => {
     const vals = it.data || {}; const calc = (c.calc && c.calc.summary) || {}; const m = S.policy.materiality.amount;
     const diffs = ITA34_FIELDS.filter((f) => Math.abs((+vals[f.key] || 0) - (+calc[f.key] || 0)) > m).map((f) => ({ key: f.key, label: f.label, firm: +calc[f.key] || 0, sars: +vals[f.key] || 0 }));
     c.ita34 = { ref: it.ref, date: it.date, values: vals, recon: { ok: !diffs.length, diffs } };
-    c.req.G13 = [{ key: 'advice', label: 'Client advised of the assessment outcome', done: false }];
-    if (diffs.length) raise(c, 'ASM-02', { by: ACTOR.ai(), note: diffs.map((d) => d.label + ': firm ' + R(d.firm) + ', SARS ' + R(d.sars)).join('; '), noSettle: true });
+    // G13 is the consultant's approval of the assessment reconciliation and of what the client will be told (step 23); the client
+    // gets the assessment package only after G13 passes (step 24). The key stays 'advice' so existing callers keep working.
+    c.req.G13 = [{ key: 'advice', label: 'Assessment reconciliation and client communication approved', detail: 'Reviewed: ' + STEP[23].items.join('; '), done: false }];
+    if (diffs.length) raise(c, 'ASM-02', { by: ACTOR.ai(), note: diffs.map((d) => d.label + ': firm ' + money(d.firm) + ', SARS ' + money(d.sars)).join('; '), noSettle: true });
   }
   function receive(o) {
     const f = SARS_FN[o.fn]; if (!f || f.dir !== 'in') throw new Error('Unknown inbound SARS item ' + o.fn);
@@ -4165,7 +4246,7 @@ const ENGINE = (() => {
   /* ===================== Documents and the simulated AI file checks (name and size only) ===================== */
   function upload(c, itemId, file, a) {
     const it = c.items.find((x) => x.id === itemId); if (!it) return fail('No checklist item ' + itemId);
-    if (a.type === 'client') { if (a.id !== c.clientId || a.via !== 'portal') return fail('Not this client'); }
+    if (a.type === 'client') { if (a.id !== c.clientId || a.via !== 'portal') return refuse(a, c, 'Upload refused', 'Not this client', { doc: it.id }); }
     else { const w = staffWhy(a, ['Administrator', 'Tax Consultant']); if (w) return refuse(a, c, 'Upload refused', w); }
     const d = { id: nextId('docN', 'D', 3), itemId, name: String(file.name), size: +file.size || 0, at: now(), by: a.type === 'client' ? c.clientId : a.id, hash: null, status: 'validated', kind: null, confidence: null };
     d.hash = digest({ name: d.name, size: d.size, at: d.at, caseId: c.id });
@@ -4272,12 +4353,20 @@ const ENGINE = (() => {
           return refuse(a, c, 'Questionnaire not submitted', missing.length + ' required question' + (missing.length === 1 ? ' is' : 's are') + ' unanswered');
         }
         if (q.status !== 'submitted') {
-          q.status = 'submitted'; q.at = now();
+          q.status = 'submitted'; q.at = now(); q.sent = Object.assign({}, q.answers);
           log(a, 'Submitted the questionnaire', Object.assign(cf(c), { result: 'Submitted' }));
           openOf(c, 'QUE-01').forEach((x) => finishResolve(x, a, 'All mandatory responses completed and saved', null));
           QUESTIONS.forEach((qq) => { if (q.answers[qq.key] && qq.kind && !c.items.some((it) => it.kind === qq.kind)) addItem(c, qq.kind); });
           c.priorYear.filter((k) => q.answers[k] === false).forEach((k) => raise(c, 'QUE-04', { by: ACTOR.ai(), item: k, note: (QUESTIONS.find((x) => x.key === k) || { label: k }).label + ' Yes last year, no this year', noSettle: true }));
           QUESTIONS.filter((qq) => qq.material && q.answers[qq.key] === true && !c.priorYear.includes(qq.key)).forEach((qq) => raise(c, 'QUE-03', { by: ACTOR.ai(), item: qq.key, note: 'New this year: ' + qq.label, noSettle: true }));
+        } else if (q.sent) {
+          // A resend after G03 was held: only answers that changed since the last send add checklist items or raise QUE-04/QUE-03,
+          // so codes the consultant already resolved are not raised again.
+          const changed = QUESTIONS.filter((qq) => qq.key in q.answers && q.answers[qq.key] !== q.sent[qq.key]);
+          changed.forEach((qq) => { if (q.answers[qq.key] && qq.kind && !c.items.some((it) => it.kind === qq.kind)) addItem(c, qq.kind); });
+          changed.filter((qq) => c.priorYear.includes(qq.key) && q.answers[qq.key] === false).forEach((qq) => raise(c, 'QUE-04', { by: ACTOR.ai(), item: qq.key, note: qq.label + ' Yes last year, no this year', noSettle: true }));
+          changed.filter((qq) => qq.material && q.answers[qq.key] === true && !c.priorYear.includes(qq.key)).forEach((qq) => raise(c, 'QUE-03', { by: ACTOR.ai(), item: qq.key, note: 'New this year: ' + qq.label, noSettle: true }));
+          q.sent = Object.assign({}, q.answers);
         }
         return release(c, 'G03', a);
       }
@@ -4343,8 +4432,10 @@ const ENGINE = (() => {
         if (d.choice !== 'accept' && d.choice !== 'instruct') return fail('Accept the assessment or instruct the firm');
         if (c.gates.G14.status === 'released') return fail('The decision is already recorded');
         const prev = c.decision;
-        c.decision = { choice: d.choice, at: now(), note: String(d.note || '') };
-        const r = release(c, 'G14', a);
+        // The G14 box: the instruction is captured with its timestamp and the assessment it answers.
+        const ita = c.ita34 ? { ref: c.ita34.ref, date: c.ita34.date } : null;
+        c.decision = { choice: d.choice, at: now(), note: String(d.note || ''), ita34: ita };
+        const r = release(c, 'G14', a, ita ? { evidence: (d.choice === 'accept' ? 'Accepted' : 'Instructed the firm on') + ' ITA34 ' + ita.ref + ' dated ' + dayText(ita.date), sarsRef: ita.ref } : {});
         if (!r.ok) { c.decision = prev; return r; }
         if (d.choice === 'instruct') {
           raise(c, 'CLT-07', { by: a, fromGate: 'G14', note: d.note || 'The client does not accept the assessment', noSettle: true });
@@ -4486,7 +4577,7 @@ const ENGINE = (() => {
     const left = DATES.businessDaysBetween(DATES.fromLocal(now()), DATES.dt(due), { ch9: !!ch9 });
     if (left > S.policy.warnDays) return false;
     c.warned[key] = true;
-    raise(c, code, { by: ACTOR.system(), sarsDeadline: due, note: left < 0 ? 'The deadline ' + due + ' has passed' : left + ' business day' + (left === 1 ? '' : 's') + ' left to ' + due });
+    raise(c, code, { by: ACTOR.system(), sarsDeadline: due, note: left < 0 ? 'The deadline ' + dayText(due) + ' has passed' : left + ' business day' + (left === 1 ? '' : 's') + ' left to ' + dayText(due) });
     return true;
   }
   function watchCase(c) {
@@ -4511,7 +4602,7 @@ const ENGINE = (() => {
     if (c.submission && c.submission.ok && !ret.from && !ret.raised.meta) { ret.raised.meta = true; raise(c, 'RET-05', { by: ACTOR.system(), note: 'Submitted, but no retention start date is recorded' }); changed = true; }
     if (ret.review && isoDay(now()) >= ret.review) {
       let hit = false;
-      if (!ret.raised.review) { ret.raised.review = true; raise(c, 'RET-03', { by: ACTOR.system(), note: 'Retention review date ' + ret.review + ' reached. Nothing is deleted automatically.', noSettle: true }); hit = true; }
+      if (!ret.raised.review) { ret.raised.review = true; raise(c, 'RET-03', { by: ACTOR.system(), note: 'Retention review date ' + dayText(ret.review) + ' reached. Nothing is deleted automatically.', noSettle: true }); hit = true; }
       ret.holds.filter((h) => !h.released && !exOf(c).some((x) => x.holdId === h.id && x.status !== 'closed')).forEach((h) => {
         raise(c, h.kind === 'dispute' ? 'RET-02' : (h.kind === 'legal' ? 'RET-04' : 'RET-01'), { by: ACTOR.system(), holdId: h.id, note: h.label + ' is still active at the review date', noSettle: true });
         hit = true;
@@ -4554,16 +4645,16 @@ const ENGINE = (() => {
       if (c.gates[g].status === 'released') return refuse(a, c, 'Move of ' + c.id + ' refused', g + ' is released; the card moves when SARS confirms its transaction (G18 on the SARS link)', { gate: g });
       if (g === 'G07') { const r7 = canRelease(c, 'G07', ACTOR.system()); return refuse(a, c, 'Move of ' + c.id + ' refused', 'G07 is Operon’s own freeze: ' + (r7.why || 'waiting'), { gate: g, code: list(r7.codes) || null }, { codes: r7.codes }); }
       const r = release(c, g, a);
-      if (!r.ok) { log(a, 'Move of ' + c.id + ' snapped back to ' + from, Object.assign(cf(c), { gate: g, code: list(r.codes) || null, result: 'Refused', reason: r.why })); return fail(r.why, { codes: r.codes, blockers: r.blockers, from, to: from }); }
+      if (!r.ok) { log(a, 'Move of ' + c.id + ' snapped back to ' + colLabel(from), Object.assign(cf(c), { gate: g, code: list(r.codes) || null, result: 'Refused', reason: r.why })); return fail(r.why, { codes: r.codes, blockers: r.blockers, from, to: from }); }
       if (!stepDone(c, g)) {
-        log(a, g + ' released by drag; ' + c.id + ' stays in ' + from + ' until SARS confirms the transaction (G18 on the SARS link)', Object.assign(cf(c), { gate: g, result: 'Released' }));
+        log(a, g + ' released by drag; ' + c.id + ' stays in ' + colLabel(from) + ' until SARS confirms the transaction (G18 on the SARS link)', Object.assign(cf(c), { gate: g, result: 'Released' }));
         return okr({ from, to: columnOf(c), awaiting: 'G18' });
       }
       if (columnOf(c) !== from) break;
     }
     const to = columnOf(c);
-    if (to === from) return refuse(a, c, 'Move of ' + c.id + ' refused', 'Nothing left to release in ' + from, audit);
-    log(a, 'Moved ' + c.id + ' from ' + from + ' to ' + to, Object.assign(cf(c), { before: from, after: to, result: 'Moved' }));
+    if (to === from) return refuse(a, c, 'Move of ' + c.id + ' refused', 'Nothing left to release in ' + colLabel(from), audit);
+    log(a, 'Moved ' + c.id + ' from ' + colLabel(from) + ' to ' + colLabel(to), Object.assign(cf(c), { before: from, after: to, result: 'Moved' }));
     return okr({ from, to });
   }
   // Dragging backward is "return for rework": a reason, backward only, before submission only. It re-opens from the target column's first
@@ -4581,7 +4672,7 @@ const ENGINE = (() => {
     if (supersede) c.approval.superseded = true;
     reopenFrom(c, supersede && SEQ.indexOf(g0) > SEQ.indexOf('G06') ? 'G06' : g0, a, 'Returned for rework: ' + reason);
     c.gates[g0].rework = { by: a.id, at: now(), reason };
-    log(a, 'Returned ' + c.id + ' from ' + from + ' to ' + toKey + ' for rework: ' + reason, Object.assign(cf(c), { before: from, after: toKey, reason, gate: g0, result: 'Rework' }));
+    log(a, 'Returned ' + c.id + ' from ' + colLabel(from) + ' to ' + colLabel(toKey) + ' for rework: ' + reason, Object.assign(cf(c), { before: from, after: toKey, reason, gate: g0, result: 'Rework' }));
     settle(c);
     return okr({ from, to: columnOf(c) });
   }
@@ -5016,7 +5107,12 @@ const DEMO_SEED = (() => {
       ['2026-08-03 09:00', () => { open('declaration', { items: ['irp5', 'medical', 'ra'], priorYear: ['employment', 'medical', 'ra'] }); drive('declaration', 'G05'); }],
       ['2026-08-24 10:00', () => { extract('declaration', IRP5(587000, 133900).concat(MED(50400, 7200), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 54000)]), { months: 12, dependants: 1 }); calc('declaration'); rel('declaration', 'G05'); }],
       ['2026-08-25 19:30', () => { drive('declaration', 'G18'); }],
-      ['2026-10-13 10:00', () => { file('declaration'); }],
+      // The morning watcher raised PRE-04 on 9 Oct (10 business days before the 23 Oct deadline for non-provisional taxpayers).
+      ['2026-10-13 10:00', () => {
+        const x = ENGINE.exOf(K.declaration.c).find((y) => y.code === 'PRE-04' && ENGINE.isOpen(y));
+        if (x) ok(ENGINE.resolve(x, K.declaration.tc, { action: 'Filing plan approved: the return goes today, before the 23 Oct deadline; the client was told by email' }), 'declaration resolve PRE-04');
+        file('declaration');
+      }],
       ['2026-11-03 07:30', () => {
         const { c, cl } = K.declaration;
         ENGINE.receive({ fn: 'daIn', taxRef: cl.taxRef, year: c.year, ref: 'DA-2026-118204', date: '2026-11-03', due: '2026-11-17', data: { questions: [
@@ -5097,6 +5193,13 @@ const DEMO_SEED = (() => {
       ['2026-08-07 12:30', () => { ok(ENGINE.portal(K.closed.c, 'decide', { choice: 'accept', note: '' }), 'closed decide'); }],
     ]);
 
+    // The deadline watcher runs every morning at 07:00, from the first seeded day to the demo day (9 Nov 2026), as the live clock
+    // would have. So PRE-04, DA-05, VRF-03 and REM-09 appear in the trail on the day they fall inside the warning window.
+    const first = steps.reduce((m, s) => (s.when < m ? s.when : m), steps[0].when).slice(0, 10);
+    for (let d = DATES.dt(first); DATES.iso(d) <= '2026-11-09'; d = DATES.add(d, 1)) {
+      const day = DATES.iso(d);
+      steps.push({ when: day + ' 07:00', key: 'watch', fn: () => { const n = S.watchErrors || 0; ENGINE.watch(); if ((S.watchErrors || 0) > n) P.push('watch on ' + day + ': a case failed'); } });
+    }
     steps.sort((a, b) => (a.when < b.when ? -1 : a.when > b.when ? 1 : 0));
     steps.forEach((s) => { try { at(s.when, s.fn); } catch (e) { P.push(s.key + ' at ' + s.when + ': ' + e.message); } });
     at('2026-11-09 08:58', () => ENGINE.watch());
@@ -5145,10 +5248,15 @@ const VK = (() => {
   // An ID number shows only its first 6 digits (the date of birth); a tax reference only its last 4.
   const maskId = (v) => { const s = String(v == null ? '' : v).replace(/\s/g, ''); return s.length <= 6 ? '•'.repeat(s.length) : s.slice(0, 6) + '•'.repeat(s.length - 6); };
   const maskTaxRef = (v) => { const s = String(v == null ? '' : v).replace(/\s/g, ''); return s.length <= 4 ? '•'.repeat(s.length) : '•'.repeat(s.length - 4) + s.slice(-4); };
-  const idHtml = (v) => `<span class="mono vk-masked" title="ID number, masked: only the date of birth shows">${esc(maskId(v))}</span>`;
+  // A client with no RSA ID number (a passport-only client) shows that plainly instead of an empty mask.
+  const idHtml = (v) => (String(v == null ? '' : v).trim() ? `<span class="mono vk-masked" title="ID number, masked: only the date of birth shows">${esc(maskId(v))}</span>` : '<span class="muted">No RSA ID number</span>');
   const taxRefHtml = (v) => `<span class="mono vk-masked" title="Tax reference, masked: only the last 4 digits show">${esc(maskTaxRef(v))}</span>`;
-  // Free text from the audit trail or notes: any bare 13-digit (ID) or 10-digit (tax reference) number is masked too.
-  const scrub = (t) => String(t == null ? '' : t).replace(/\b\d{13}\b/g, maskId).replace(/\b\d{10}\b/g, maskTaxRef);
+  // Free text from the audit trail, notes and file names: any 13-digit run (an ID number) or 10-digit run (a tax reference) is
+  // masked, even inside a word or next to an underscore (IRP5_9061007331_2026.pdf), so digit lookarounds are used, not \b.
+  // A calendar day written YYYY-MM-DD reads as a date (12 Nov 2026); an invalid one is left as it was received.
+  const isoDay = (m) => { const d = DATES.dt(m) ? toDay(m) : null; return d ? fDate(d) : m; };
+  const scrub = (t) => String(t == null ? '' : t).replace(/(?<!\d)\d{13}(?!\d)/g, maskId).replace(/(?<!\d)\d{10}(?!\d)/g, maskTaxRef)
+    .replace(/(?<![\d-])\d{4}-\d{2}-\d{2}(?![\d-])/g, isoDay);
 
   /* ---------- money and dates ---------- */
   const money = (n) => (n == null || n === '' || !isFinite(+n) ? '<span class="muted">—</span>' : `<span class="num">${esc(CALC.rand(+n))}</span>`);
@@ -5367,7 +5475,7 @@ const VK = (() => {
       const checks = ENGINE.g18Checks(tx); const gb = ENGINE.g18Blockers(tx);
       modal('Sign G18 for ' + tx.id, `${facts([['Case', esc(c.id) + ' · ' + esc(cl.name)], ['Transaction', esc(tx.id + ' · ' + tx.label + ' · version ' + tx.version)],
         ['Signed so far', tx.signoffs.length ? esc(tx.signoffs.map((s) => pname(s.id) + ' (' + s.role + ')').join(', ')) : 'Nobody yet']])}
-        <ol class="vk-checks">${checks.map((k) => `<li class="${k.ok ? 'ok' : 'bad'}">${k.ok ? I.check : I.alert}<span>${esc(k.label)}${k.ok ? '' : `<br><span class="err">${esc(k.why)}</span>`}</span></li>`).join('')}</ol>
+        <ol class="vk-checks">${checks.map((k) => `<li class="${k.ok ? 'ok' : 'bad'}">${k.ok ? I.check : I.alert}<span>${esc(k.label)}${k.ok ? '' : `<br><span class="err">${esc(scrub(k.why))}</span>`}</span></li>`).join('')}</ol>
         ${gb.length ? `<p class="err">Blocked by ${esc(gb.join(', '))}</p>` : ''}
         <p class="hint">G18 needs two different people: the Integration Administrator and the Tax Consultant. Nothing is sent to SARS: the link is simulated.</p>`,
       'Sign G18', () => finish(ENGINE.signG18(tx, ACTOR.me()), 'Signed G18 for ' + tx.id + '.'));
@@ -5376,7 +5484,7 @@ const VK = (() => {
     const cr = ENGINE.canRelease(c, g, ACTOR.me());
     modal('Release ' + g + ' for ' + c.id, `${facts([['Gate', esc(g + ' · ' + gateName(g))], ['Case', esc(c.id) + ' · ' + esc(cl.name)], ['Version', esc(ENGINE.vN(c) || 'none yet')]])}
       ${GATE[g].criterion ? `<p class="small"><span class="muted">Release when:</span> ${esc(GATE[g].criterion)}</p>` : ''}
-      ${cr.ok ? `<p class="vk-okline">${I.check} Every check for ${esc(g)} passes.</p>` : `<p class="err">${esc(cr.why)}</p>`}
+      ${cr.ok ? `<p class="vk-okline">${I.check} Every check for ${esc(g)} passes.</p>` : `<p class="err">${esc(scrub(cr.why))}</p>`}
       <label class="f" for="vk-rel-ev">Note or evidence (optional)<input id="vk-rel-ev" name="evidence" maxlength="300" autocomplete="off"></label>
       <p class="hint">You release it as ${esc(S.role)} (${esc(me().name)}). Operon records it in the audit trail.</p>`,
     'Release ' + g, (fd) => finish(ENGINE.release(c, g, ACTOR.me(), { evidence: String(fd.evidence || '').trim() }), 'Released ' + g + ' for ' + c.id + '.'));
@@ -5390,7 +5498,7 @@ const VK = (() => {
     modal('Resolve ' + x.id, `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
       ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Resolved when', esc(def.resolution || '')]])}
       ${x.note ? `<p class="note">${esc(scrub(x.note))}</p>` : ''}
-      ${guard ? `<p class="err">${esc(guard)}</p>` : ''}
+      ${guard ? `<p class="err">${esc(scrub(guard))}</p>` : ''}
       <label class="f" for="vk-res-action">What was done (required)<textarea id="vk-res-action" name="action" maxlength="1000"></textarea></label>
       <label class="f" for="vk-res-ev">Evidence (optional)<input id="vk-res-ev" name="evidence" maxlength="300" autocomplete="off" placeholder="A file name or reference"></label>
       ${x.secondary ? `<p class="hint">A different person in the ${esc(x.secondary)} role then closes it as secondary reviewer. It keeps blocking until then.</p>` : ''}`,
@@ -5406,12 +5514,44 @@ const VK = (() => {
     if (!x) { toast('That exception is no longer here.'); render(); return; }
     const c = x.caseId ? ENGINE.caseById(x.caseId) : null;
     modal('Close ' + x.id + ' as secondary reviewer', `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
-      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Resolved by', esc(x.resolvedBy || '')], ['What was done', esc(scrub(x.resolution || ''))], ['Evidence', esc(x.evidence || 'None given')]])}
+      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Resolved by', esc(x.resolvedBy || '')], ['What was done', esc(scrub(x.resolution || ''))], ['Evidence', esc(scrub(x.evidence || 'None given'))]])}
       <label class="f" for="vk-close-note">Review note (optional)<input id="vk-close-note" name="note" maxlength="300" autocomplete="off"></label>
       <p class="hint">Close it only if the resolution meets the register’s criterion. You must not be the person who resolved it.</p>`,
     'Close exception', (fd) => finish(ENGINE.close(x, ACTOR.me(), { note: String(fd.note || '').trim() }), 'Closed ' + x.id + ' (' + x.code + ').'));
   }
-  Object.assign(ACT, { 'vk.release': actRelease, 'vk.resolve': actResolve, 'vk.close': actClose });
+  // The register gives some codes to a platform role (AI-07, AI-06, VER-02) or a platform secondary reviewer (TAX-06). The platform
+  // team works outside the firm, so the preview simulates it: anyone may press the button, and ENGINE records the simulated
+  // ACTOR.platform(<that role>), never the signed-in person.
+  const isPlatform = (role) => /^Platform /.test(String(role || ''));
+  const SIM_NOTE = 'In real life the platform team does this outside Operon. Here it is simulated: Operon records it as the platform team, not as you.';
+  function actPlatResolve(t) {
+    const x = ENGINE.exById(t.dataset.ex);
+    if (!x || !isPlatform(x.owner)) { toast('That exception is no longer here.'); render(); return; }
+    const c = x.caseId ? ENGINE.caseById(x.caseId) : null; const def = CODE[x.code] || {};
+    const guard = ENGINE.resolveGuard(c, x);
+    modal('Resolve ' + x.id + ' as the simulated platform team', `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
+      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Owner', esc(x.owner + ' (simulated platform team)')], ['Resolved when', esc(def.resolution || '')]])}
+      ${guard ? `<p class="err">${esc(scrub(guard))}</p>` : ''}
+      <label class="f" for="vk-pres-action">What the platform team did (required)<textarea id="vk-pres-action" name="action" maxlength="1000"></textarea></label>
+      <label class="f" for="vk-pres-ev">Evidence (optional)<input id="vk-pres-ev" name="evidence" maxlength="300" autocomplete="off" placeholder="A file name or reference"></label>
+      <p class="hint">${esc(SIM_NOTE)}${x.secondary ? esc(' A ' + x.secondary + ' then closes it as secondary reviewer.') : ''}</p>`,
+    'Resolve as the platform team', (fd) => {
+      const action = String(fd.action || '').trim();
+      if (!action) return 'Write what the platform team did.';
+      return finish(ENGINE.resolve(x, ACTOR.platform(x.owner), { action, evidence: String(fd.evidence || '').trim() || null }), 'Resolved ' + x.id + ' (' + x.code + ') as the simulated ' + x.owner + '.');
+    });
+  }
+  function actPlatClose(t) {
+    const x = ENGINE.exById(t.dataset.ex);
+    if (!x || !isPlatform(x.secondary)) { toast('That exception is no longer here.'); render(); return; }
+    const c = x.caseId ? ENGINE.caseById(x.caseId) : null;
+    modal('Close ' + x.id + ' as the simulated platform team', `<p class="row">${codeChip(x.code)}${sevChip(x.sev)}<strong>${esc(x.title)}</strong></p>
+      ${facts([['Case', c ? esc(c.id) + ' · ' + esc(clientName(c.clientId)) : 'No case'], ['Secondary reviewer', esc(x.secondary + ' (simulated platform team)')], ['Resolved by', esc(x.resolvedBy || '')], ['What was done', esc(scrub(x.resolution || ''))]])}
+      <label class="f" for="vk-pclose-note">Review note (optional)<input id="vk-pclose-note" name="note" maxlength="300" autocomplete="off"></label>
+      <p class="hint">${esc(SIM_NOTE)}</p>`,
+    'Close as the platform team', (fd) => finish(ENGINE.close(x, ACTOR.platform(x.secondary), { note: String(fd.note || '').trim() }), 'Closed ' + x.id + ' (' + x.code + ') as the simulated ' + x.secondary + '.'));
+  }
+  Object.assign(ACT, { 'vk.release': actRelease, 'vk.resolve': actResolve, 'vk.close': actClose, 'vk.platResolve': actPlatResolve, 'vk.platClose': actPlatClose });
 
   // Buttons for the shared actions. A row from waitingGates() or myExceptions() picks the right one; locked buttons say why.
   function releaseBtn(row) {
@@ -5420,15 +5560,26 @@ const VK = (() => {
     const data = { case: row.c.id, gate: row.g }; if (row.tx) data.tx = row.tx.id;
     return btn(label, 'vk.release', { cls: 'sm' + (row.ready ? ' primary' : ''), data, title: row.ready ? '' : row.why });
   }
+  // Resolve, or Close as the secondary reviewer. Only the role that may act gets a live button; everyone else sees a lock saying
+  // who acts. Platform-owned codes get the simulated platform team's button instead (any role may press it; ENGINE records the
+  // platform actor).
   function exceptionBtn(row) {
     const x = row.x; const a = ACTOR.me();
     if (row.need === 'close') {
-      return btn('Close', 'vk.close', { cls: 'sm', data: { ex: x.id }, lock: x.resolvedById === a.id ? 'You resolved it; someone else closes it' : null });
+      if (x.status !== 'resolved') return '';
+      if (!x.secondary) return `<span class="lock">${I.hourglass}${esc('Closes by itself when its gates are done')}</span>`;
+      if (isPlatform(x.secondary)) return btn('Close as the simulated platform team', 'vk.platClose', { cls: 'sm', data: { ex: x.id }, title: 'The ' + x.secondary + ' closes it; the preview simulates the platform team' });
+      const lock = x.secondary !== a.role ? 'Closed by the ' + x.secondary : (x.resolvedById === a.id ? 'You resolved it; someone else closes it' : null);
+      return btn('Close', 'vk.close', { cls: 'sm', data: { ex: x.id }, lock });
+    }
+    const guard = ENGINE.resolveGuard(x.caseId ? ENGINE.caseById(x.caseId) : null, x);
+    if (isPlatform(x.owner)) {
+      if (guard) return `<span class="lock">${I.hourglass}${esc(scrub(guard))}</span>`;
+      return btn('Resolve as the simulated platform team', 'vk.platResolve', { cls: 'sm', data: { ex: x.id }, title: 'The ' + x.owner + ' resolves it; the preview simulates the platform team' });
     }
     const whoWhy = ENGINE.resolverCheck(x, a);
     if (whoWhy) return `<span class="lock">${I.lock}${esc(whoWhy)}</span>`;
-    const guard = ENGINE.resolveGuard(x.caseId ? ENGINE.caseById(x.caseId) : null, x);
-    if (guard) return `<span class="lock">${I.hourglass}${esc(guard)}</span>`;
+    if (guard) return `<span class="lock">${I.hourglass}${esc(scrub(guard))}</span>`;
     return btn('Resolve', 'vk.resolve', { cls: 'sm', data: { ex: x.id } });
   }
 
@@ -5455,9 +5606,9 @@ NAV_COUNT.approvals = () => VK.waitingGates(S.role).length;
     const rows = VK.waitingGates(role);
     const ready = rows.filter((r) => r.ready).length;
     const status = (r) => {
-      if (r.ready) return `${VK.pill(r.kind === 'g18' ? 'Your sign-off is next' : 'Ready for you', 'ok')}${r.note ? `<div class="small muted">${esc(r.note)}</div>` : ''}`;
+      if (r.ready) return `${VK.pill(r.kind === 'g18' ? 'Your sign-off is next' : 'Ready for you', 'ok')}${r.note ? `<div class="small muted">${esc(VK.scrub(r.note))}</div>` : ''}`;
       const codes = r.blockers.length ? `<div class="vk-codes">${r.blockers.map((x) => VK.codeChip(x.code, x) + VK.sevChip(x.sev, { short: true })).join(' ')}</div>` : '';
-      const miss = r.blockers.length ? '' : `<div class="small">${esc(r.why.replace(/^Not ready: /, ''))}</div>`;
+      const miss = r.blockers.length ? '' : `<div class="small">${esc(VK.scrub(r.why.replace(/^Not ready: /, '')))}</div>`;
       return `${VK.pill(r.blockers.length ? 'Blocked' : 'Waiting', r.blockers.length ? 'bad' : 'warn')}${codes}${miss}`;
     };
     const table = VK.table([{ label: 'Gate' }, { label: 'Case' }, { label: 'What it approves' }, { label: 'Status' }, { label: '', cls: 'vk-act' }],
@@ -5813,12 +5964,16 @@ VIEWS.cases = () => CASES_BOARD.view();
    documents with extracted values and lineage, the calculation pack, client approval and versions, SARS transactions, then the
    Declaration Alert, verification/audit and ITA34/remedies sections when they apply, the case's audit trail and retention.
    Every change goes through ENGINE with ACTOR.me(): the kit's shared actions (vk.release, vk.resolve, vk.close), the board's moves
-   (cases.fwd, cases.back) and this page's own actions (cases.decide, cases.recalc, cases.na). Refusals show the engine's reason. */
+   (cases.fwd, cases.back) and this page's own actions: cases.req (tick a gate checklist item, ENGINE.markReq), cases.values (record the
+   values read from a document, ENGINE.setInputs), cases.decide, cases.recalc, cases.na and cases.remedy (ENGINE.chooseRemedy).
+   Buttons only one role may use are locked for the others, with the reason; ENGINE checks the role again. Refusals show the
+   engine's reason. File names and free text go through VK.scrub, so ID and tax numbers in them stay masked. */
 (() => {
   const AUDIT_N = 30;
   const dd = (iso) => { const d = VK.toDay(iso); return d ? fDate(d) : String(iso || ''); };  // a calendar day as text, e.g. 8 Dec 2026
   const short = (h) => (h ? String(h).slice(0, 10) + '…' : '—');
-  const lockNote = (text) => `<span class="lock">${I.lock}${esc(text)}</span>`;
+  const TC = 'Tax Consultant';
+  const tcLock = () => (S.role === TC ? null : 'Tax Consultant only');
   const yes = (v) => (v === true ? VK.pill('Yes', 'info') : v === false ? VK.pill('No', '') : '<span class="muted">Not answered</span>');
   const whoRel = (g) => {
     const r = RELEASE[g];
@@ -5906,7 +6061,7 @@ VIEWS.cases = () => CASES_BOARD.view();
   /* ---------- exceptions ---------- */
   function exAction(x) {
     if (ENGINE.isOpen(x)) return VK.exceptionBtn({ x, need: 'resolve' });
-    if (x.status === 'resolved' && x.secondary) return x.secondary === S.role ? VK.exceptionBtn({ x, need: 'close' }) : lockNote('Closed by the ' + x.secondary);
+    if (x.status === 'resolved' && x.secondary) return VK.exceptionBtn({ x, need: 'close' });
     return '';
   }
   function exRow(x) {
@@ -5923,7 +6078,7 @@ VIEWS.cases = () => CASES_BOARD.view();
       + (closed.length ? `<details class="cs-more"><summary>${esc(plural(closed.length, 'closed exception'))}</summary>${VK.table(cols, closed.map(exRow), { caption: 'Closed exceptions on ' + c.id })}</details>` : '');
     return VK.section('cases-case-exceptions', 'Exceptions', body, {
       count: live.filter((x) => ENGINE.isOpen(x)).length,
-      intro: esc('S1 stops every gate on the case; S2 blocks the gates it is mapped to. A resolved exception with a secondary reviewer keeps blocking until a different person closes it.'),
+      intro: esc('S1 stops every gate on the case. Otherwise the register’s Blocking column decides: a blocking code stops the gates it is mapped to, whatever its severity (S2 or S3). A resolved exception with a secondary reviewer keeps blocking until a different person closes it.'),
       actions: '<a href="#exceptions">Exception register</a>',
     });
   }
@@ -5931,44 +6086,61 @@ VIEWS.cases = () => CASES_BOARD.view();
   /* ---------- four-source analysis ---------- */
   const TOPIC_FIELDS = { employment: ['remuneration', 'medicalFringe', 'paye', 'retirementFund'], medical: ['medicalFees', 'medicalExpenses'], ra: ['ra'], interest: ['interest', 'dividends'],
     rental: ['rentalIncome', 'rentalExpenses'], cgt: ['capitalGain'], foreign: ['foreignIncome', 'foreignTaxCredit'], travel: ['travel'], homeoffice: ['homeOffice'], donations: ['donations'] };
+  // Step 6 of the master document names the four sources, in this order (verbatim, without the full stop).
+  const SOURCES = ((STEP[6] && STEP[6].items) || ['Previous submitted ITR12.', 'Current SARS pre-populated ITR12.', 'Previous firm supporting-document request.', 'Current-year client tax questionnaire.']).map((t) => String(t).replace(/\.$/, ''));
+  // Last year's document request: the case's own record when it has one; otherwise the documents last year's return needed.
+  const lastRequest = (c) => (Array.isArray(c.priorRequest) ? { kinds: c.priorRequest.slice(), kept: true }
+    : { kinds: ENGINE.QUESTIONS.filter((q) => c.priorYear.includes(q.key) && q.kind).map((q) => q.kind), kept: false });
   function sourcesBlock(c) {
     const Q = ENGINE.QUESTIONS; const ans = c.questionnaire.answers || {}; const pre = (c.prepop && c.prepop.data) || {};
-    const lines = (c.inputs && c.inputs.lines) || [];
-    const topics = Q.filter((q) => c.questionnaire.required.includes(q.key) || q.key in ans || c.priorYear.includes(q.key)
+    const lines = (c.inputs && c.inputs.lines) || []; const req = lastRequest(c);
+    const topics = Q.filter((q) => c.questionnaire.required.includes(q.key) || q.key in ans || c.priorYear.includes(q.key) || req.kinds.includes(q.kind)
       || (TOPIC_FIELDS[q.key] || []).some((f) => f in pre) || c.items.some((it) => it.kind === q.kind));
     const rows = topics.map((q) => {
       const fields = TOPIC_FIELDS[q.key] || [];
       const sars = fields.filter((f) => f in pre);
       const docs = c.docs.filter((d) => { const it = c.items.find((x) => x.id === d.itemId); return d.kind === q.kind || (it && it.kind === q.kind); });
       const got = fields.map((f) => [f, lines.filter((l) => l.field === f)]).filter(([, ls]) => ls.length);
-      const prior = c.priorYear.includes(q.key);
-      // Open exceptions on this topic: raised on the topic itself (QUE-*), on its checklist items or on its documents (DOC-02, AI-01 ...).
+      const lineIds = got.flatMap(([, ls]) => ls.map((l) => l.id));
+      const prior = c.priorYear.includes(q.key); const askedLast = req.kinds.includes(q.kind); const askedNow = c.items.some((it) => it.kind === q.kind);
+      const answered = q.key in ans; const said = ans[q.key];
+      // Open exceptions on this topic: raised on the topic itself (QUE-*), on its checklist items, on its documents (DOC-02, AI-01 ...)
+      // or on one of its extracted values (a judgement item such as TAX-02 or AI-05).
       const itemIds = c.items.filter((it) => it.kind === q.kind).map((it) => it.id); const docIds = docs.map((d) => d.id);
-      const xs = ENGINE.exOf(c).filter((x) => ENGINE.isOpen(x) && (x.item === q.key || itemIds.includes(x.item) || (x.docId && docIds.includes(x.docId))));
+      const xs = ENGINE.exOf(c).filter((x) => ENGINE.isOpen(x) && (x.item === q.key || itemIds.includes(x.item) || (x.docId && docIds.includes(x.docId)) || (x.calcRef && lineIds.includes(x.calcRef))));
+      const evidence = docs.length > 0 || got.length > 0;
       const find = [];
-      if (prior && ans[q.key] === false) find.push(['Declared last year, not this year', 'warn']);
-      if (!prior && ans[q.key] === true) find.push(['New this year', 'info']);
-      if (ans[q.key] === true && !docs.some((d) => d.status === 'validated') && !c.items.some((it) => it.kind === q.kind && it.na === 'approved')) find.push(['Document outstanding', 'warn']);
+      if (!answered) find.push([evidence ? 'Documents, but not in the questionnaire' : 'Not answered yet', 'warn']);
+      else if (said === false && evidence) find.push(['Documents, but the client answered no', 'warn']);
+      if (prior && said === false) find.push(['Declared last year, not this year', 'warn']);
+      else if (askedLast && !askedNow && said !== true) find.push(['Requested last year, not this year', 'warn']);
+      if (!prior && said === true) find.push(['New this year', 'info']);
+      if (said === false && sars.length) find.push(['SARS has pre-populated data, but the client answered no', 'warn']);
+      if (said === true && !docs.some((d) => d.status === 'validated') && !c.items.some((it) => it.kind === q.kind && it.na === 'approved')) find.push(['Document outstanding', 'warn']);
       sars.forEach((f) => {
         const mine = lines.filter((l) => l.field === f).reduce((a, l) => a + l.amount, 0);
         if (got.some(([k]) => k === f) && Math.abs(mine - pre[f]) > S.policy.materiality.amount) find.push([(CALC.FIELDS[f] || {}).label + ' differs from SARS', 'bad']);
       });
+      // "Consistent" only when the client answered and nothing else is flagged or open on the topic.
       if (!find.length && !xs.length) find.push(['Consistent', 'ok']);
       return [
         `<strong>${esc(q.label)}</strong>`,
-        yes(ans[q.key]),
-        sars.length ? sars.map((f) => `<div class="small">${esc((CALC.FIELDS[f] || {}).label || f)}: ${VK.money(pre[f])}</div>`).join('') : '<span class="muted">Nothing</span>',
         prior ? VK.pill('Declared', 'info') : '<span class="muted">Not declared</span>',
-        (docs.length ? docs.map((d) => `<div class="small">${esc(d.name)} ${docStatus(d)}</div>`).join('') : '<span class="muted">None</span>')
+        sars.length ? sars.map((f) => `<div class="small">${esc((CALC.FIELDS[f] || {}).label || f)}: ${VK.money(pre[f])}</div>`).join('') : '<span class="muted">Nothing</span>',
+        askedLast ? VK.pill('Requested', 'info') : '<span class="muted">Not requested</span>',
+        yes(ans[q.key]),
+        (docs.length ? docs.map((d) => `<div class="small">${esc(VK.scrub(d.name))} ${docStatus(d)}</div>`).join('') : '<span class="muted">None</span>')
           + got.map(([f, ls]) => `<div class="small muted">${esc((CALC.FIELDS[f] || {}).label || f)}: ${VK.money(ls.reduce((a, l) => a + l.amount, 0))}</div>`).join(''),
         find.map(([t, tone]) => VK.pill(t, tone)).join(' ')
           + xs.map((x) => `<div class="small">${VK.codeChip(x.code, x)} ${esc(VK.scrub(x.note || x.title))}</div>`).join(''),
       ];
     });
-    const intro = 'Operon compares four sources for each topic: the client’s questionnaire, SARS’s pre-populated data, last year’s return and the documents with their extracted values. The last column is Operon’s comparison, with any open exception on the topic. '
+    const intro = 'Step 6: Operon’s AI (simulated) compares four sources for each topic: ' + SOURCES.map((t, i) => (i + 1) + '. ' + t.charAt(0).toLowerCase() + t.slice(1)).join('; ')
+      + '. The documents and their extracted values are the evidence. The last column is the comparison, with any open exception on the topic; it says “Consistent” only when the client has answered and nothing is flagged or open. '
+      + (req.kept ? '' : 'The preview keeps no separate record of last year’s document request, so it shows the documents last year’s return needed. ')
       + (c.prepop ? 'Pre-populated data ' + (c.prepop.ref || '') + ' received ' + fWhen(c.prepop.at) + '. ' : 'No pre-populated data has arrived from SARS (simulated). ')
       + (c.inputs && c.inputs.prior && typeof c.inputs.prior.taxableIncome === 'number' ? 'Last year’s taxable income: ' + CALC.rand(c.inputs.prior.taxableIncome) + '.' : '');
-    return VK.section('cases-case-sources', 'Four-source analysis', VK.table([{ label: 'Topic' }, { label: 'Questionnaire' }, { label: 'SARS pre-populated' }, { label: 'Last year' }, { label: 'Documents and values' }, { label: 'Comparison' }], rows,
+    return VK.section('cases-case-sources', 'Four-source analysis', VK.table([{ label: 'Topic' }, { label: 'Last year’s ITR12' }, { label: 'SARS pre-populated' }, { label: 'Last year’s document request' }, { label: 'This year’s questionnaire' }, { label: 'Evidence: documents and values' }, { label: 'Comparison' }], rows,
       { caption: 'Four-source analysis for ' + c.id, empty: 'No topics yet: the questionnaire has not been answered.' }), { intro: esc(intro) });
   }
 
@@ -5981,47 +6153,63 @@ VIEWS.cases = () => CASES_BOARD.view();
       let act = '';
       if (it.na === 'requested') act = btn('Approve N/A', 'cases.na', { cls: 'sm', data: { case: c.id, item: it.id } });
       return [`<strong>${esc(it.label)}</strong><div class="small muted mono">${esc(it.id)}</div>`, VK.pill(word, tone),
-        docs.length ? docs.map((d) => `<div class="small">${esc(d.name)} ${docStatus(d)}</div>`).join('') : '<span class="muted">None yet</span>',
+        docs.length ? docs.map((d) => `<div class="small">${esc(VK.scrub(d.name))} ${docStatus(d)}</div>`).join('') : '<span class="muted">None yet</span>',
         it.naReason ? `<div class="small">${esc(VK.scrub('Client: ' + it.naReason))}</div>${it.na === 'requested' ? '<div class="small muted">Waiting for the Tax Consultant</div>' : ''}` : '<span class="muted">—</span>', act];
     });
-    const reqs = Object.keys(c.req).sort().flatMap((g) => c.req[g].map((r) => `<div class="vk-row"><span class="vk-gate vk-g-${r.done ? 'done' : 'idle'}"><b>${esc(g)}</b></span><div class="vk-row-b"><div class="vk-row-t">${esc(r.label)}</div><div class="vk-meta">${r.done ? `${VK.pill('Done', 'ok')}<span>${esc(VK.who(r.by))}</span>${VK.when(r.at)}` : VK.pill('To do', 'warn')}</div></div></div>`));
+    // Each gate checklist item is ticked by the person who owns that gate (RELEASE in workflow.js); others see who does it.
+    const reqs = Object.keys(c.req).sort().flatMap((g) => c.req[g].map((r) => {
+      const owner = (RELEASE[g] || {}).role;
+      const act = r.done ? '' : `<span class="cs-reqact">${btn('Mark done', 'cases.req', { cls: 'sm', data: { case: c.id, gate: g, key: r.key }, lock: owner && S.role !== owner ? 'Done by the ' + owner + ', who owns ' + g : null })}</span>`;
+      return `<div class="vk-row cs-req"><span class="vk-gate vk-g-${r.done ? 'done' : 'idle'}"><b>${esc(g)}</b></span><div class="vk-row-b"><div class="vk-row-t">${esc(r.label)}</div><div class="vk-meta">${r.done ? `${VK.pill('Done', 'ok')}<span>${esc(VK.who(r.by))}</span>${VK.when(r.at)}` : VK.pill('To do', 'warn')}</div></div>${act}</div>`;
+    }));
     return VK.section('cases-case-checklist', 'Personalised checklist', VK.table([{ label: 'Item' }, { label: 'State' }, { label: 'Documents' }, { label: 'Not available' }, { label: '', cls: 'vk-act' }], rows,
       { caption: 'Checklist for ' + c.id, empty: 'Nothing has been requested yet.' })
       + `<h3 class="cs-h3">Gate checklists</h3>` + VK.list(reqs, { empty: 'No gate checklist items.' }), {
       count: c.items.length,
-      intro: esc('Built from the questionnaire and last year’s return: each yes adds the document it needs. The client uploads in the PaperSync portal (simulated) or asks to mark an item not available, which the Tax Consultant approves.'),
+      intro: esc('Built from the questionnaire and last year’s return: each yes adds the document it needs. The client uploads in the PaperSync portal (simulated) or asks to mark an item not available, which the Tax Consultant approves. Each gate checklist item is ticked by the owner of that gate; the gate cannot be released until its items are done.'),
     });
   }
 
   /* ---------- documents and lineage ---------- */
+  // The calculator fields a document of this kind can feed (CALC.FIELDS[...].kinds).
+  const fieldsFor = (kind) => Object.keys(CALC.FIELDS).filter((k) => (CALC.FIELDS[k].kinds || []).includes(kind));
+  function valuesBtn(c, d) {
+    if (d.status !== 'validated' || !fieldsFor(d.kind).length) return '';
+    const n = ((c.inputs && c.inputs.lines) || []).filter((l) => l.docId === d.id).length;
+    const lock = tcLock() || (c.submission && c.submission.ok ? 'The return is submitted; a correction goes through G15' : null);
+    return btn(n ? 'Change values' : 'Record values', 'cases.values', { cls: 'sm' + (n ? '' : ' primary'), data: { case: c.id, doc: d.id }, lock });
+  }
   function documentsBlock(c) {
     const docs = c.docs.map((d) => {
       const it = c.items.find((x) => x.id === d.itemId);
       const kind = d.kind ? (DOC_KINDS.find((k) => k.kind === d.kind) || {}).label || d.kind : 'Not classified';
-      return [`<strong>${esc(d.name)}</strong><div class="small muted mono">${esc(d.id)} · ${esc(Math.round(d.size / 1024) + ' KB')}</div>`, esc(it ? it.label : '—'),
+      const n = ((c.inputs && c.inputs.lines) || []).filter((l) => l.docId === d.id).length;
+      return [`<strong>${esc(VK.scrub(d.name))}</strong><div class="small muted mono">${esc(d.id)} · ${esc(Math.round(d.size / 1024) + ' KB')}</div>`, esc(it ? it.label : '—'),
         `${VK.when(d.at)}<div class="small muted">${esc(VK.who(d.by))}</div>`, docStatus(d),
         `<div class="small">${esc(kind)}</div>${d.confidence != null ? `<div class="small muted">${esc('Confidence ' + Math.round(d.confidence * 100) + '%')}</div>` : ''}`,
-        `<span class="mono small" title="${esc('SHA-256 ' + (d.hash || ''))}">${esc(short(d.hash))}</span>`];
+        `<span class="mono small" title="${esc('SHA-256 ' + (d.hash || ''))}">${esc(short(d.hash))}</span>`,
+        `${n ? `<div class="small">${esc(plural(n, 'value'))}</div>` : ''}${valuesBtn(c, d)}`];
     });
-    const lin = CALC.lineage(c).map((l) => [`<span class="mono">${esc(l.line)}</span>`, l.file ? `${esc(l.file)}${l.doc ? `<div class="small muted mono">${esc(l.doc)}</div>` : ''}` : '<span class="muted">No source</span>',
-      esc(l.ref), VK.money(l.amount), esc(l.category), `<span class="mono small">${esc(l.field)}</span>`,
+    const lin = CALC.lineage(c).map((l) => [`<span class="mono">${esc(l.line)}</span>`, l.file ? `${esc(VK.scrub(l.file))}${l.doc ? `<div class="small muted mono">${esc(l.doc)}</div>` : ''}` : '<span class="muted">No source</span>',
+      esc(VK.scrub(l.ref)), VK.money(l.amount), esc(l.category), `<span class="small">${esc((CALC.FIELDS[l.field] || {}).label || l.field)}</span>`,
       l.judgement ? (l.decided ? `${VK.pill('Decided', 'ok')}<div class="small">${esc(VK.scrub(l.decided.rationale))}</div>` : `${VK.pill('Judgement: ' + l.judgement, 'warn')}`) : '<span class="muted">Rules</span>']);
-    return VK.section('cases-case-documents', 'Documents and lineage', VK.table([{ label: 'Document' }, { label: 'Checklist item' }, { label: 'Uploaded' }, { label: 'Check' }, { label: 'AI reading (simulated)' }, { label: 'Hash' }], docs,
+    return VK.section('cases-case-documents', 'Documents and lineage', VK.table([{ label: 'Document' }, { label: 'Checklist item' }, { label: 'Uploaded' }, { label: 'Check' }, { label: 'AI reading (simulated)' }, { label: 'Hash' }, { label: 'Extracted values', cls: 'vk-act' }], docs,
       { caption: 'Documents on ' + c.id, empty: 'No documents yet.' })
       + `<h3 class="cs-h3">Extracted values and where they came from</h3>`
       + VK.table([{ label: 'Value' }, { label: 'Document' }, { label: 'Reference' }, { label: 'Amount' }, { label: 'Tax category' }, { label: 'Calculator field' }, { label: 'Treatment' }], lin,
         { caption: 'Lineage for ' + c.id, empty: 'No values extracted yet.' }), {
       count: c.docs.length,
-      intro: esc('The AI checks each upload by its name and size only (simulated): file contents are never read. Lineage runs from the document to the extracted value, its tax category and the calculator field.'),
+      intro: esc('The AI checks each upload by its name and size only (simulated): file contents are never read, so the Tax Consultant records the values read from each checked document. Lineage runs from the document to the extracted value, its tax category and the calculator field.'),
     });
   }
 
   /* ---------- calculation pack ---------- */
   function calcBlock(c) {
     const k = c.calc; const canCalc = !!c.inputs;
-    const recalc = canCalc ? btn('Recalculate', 'cases.recalc', { cls: 'sm', data: { case: c.id } }) : '';
+    const recalc = canCalc ? btn('Recalculate', 'cases.recalc', { cls: 'sm', data: { case: c.id }, lock: tcLock() }) : '';
     if (!k) {
-      return VK.section('cases-case-calc', 'Calculation pack', VK.empty(canCalc ? 'Not calculated yet.' : 'No calculation yet: no values have been extracted.'), { actions: recalc });
+      return VK.section('cases-case-calc', 'Calculation pack', VK.empty(canCalc ? 'Not calculated yet.' : 'No calculation yet: no values have been extracted.',
+        canCalc ? null : { html: '<p class="small muted">The Tax Consultant records the values from each checked document under Documents and lineage, then recalculates.</p>' }), { actions: recalc });
     }
     const summary = k.summary || {}; const errors = k.errors || [];
     const sum = ITA34_FIELDS.map((f) => [f.label, VK.money(summary[f.key])]);
@@ -6033,7 +6221,7 @@ VIEWS.cases = () => CASES_BOARD.view();
       const decided = l && l.decided;
       return [`<span class="mono">${esc(p.line)}</span>`, esc(p.label), VK.money(p.amount), VK.codeChip(p.code, ENGINE.openOf(c, p.code)[0]),
         decided ? `${VK.pill('Decided: recalculate to use it', 'info')}<div class="small">${esc(VK.scrub(decided.rationale))}</div>` : '<span class="muted">Left out until decided</span>',
-        p.field ? btn('Decide', 'cases.decide', { cls: 'sm' + (decided ? '' : ' primary'), data: { case: c.id, line: p.line } }) : ''];
+        p.field ? btn('Decide', 'cases.decide', { cls: 'sm' + (decided ? '' : ' primary'), data: { case: c.id, line: p.line }, lock: tcLock() }) : ''];
     });
     const sch = c.schedules || {}; const schRows = [];
     if (sch.interest && sch.interest.gross) schRows.push(['Interest', 'Gross ' + CALC.rand(sch.interest.gross) + ', exempt ' + CALC.rand(sch.interest.exempt) + ' (limit ' + CALC.rand(sch.interest.limit) + '), taxable ' + CALC.rand(sch.interest.taxable)]);
@@ -6121,7 +6309,7 @@ VIEWS.cases = () => CASES_BOARD.view();
   function draftsList(t) {
     if (!t.drafts || !t.drafts.length) return VK.empty('No answers drafted yet.');
     return `<p class="small muted">${esc('Drafted by ' + (t.draftedBy ? VK.who(t.draftedBy) : 'nobody') + ' ' + (t.draftedAt ? fWhen(t.draftedAt) : '') + '. The Tax Consultant reviews every answer before anything goes to SARS.')}</p>`
-      + VK.list(t.drafts.map((d) => `<div class="vk-row-b"><div class="vk-row-t">${esc(d.q)}</div><div>${esc(VK.scrub(d.a))}</div><div class="vk-meta">${d.evidence ? `<span>Evidence: ${esc(d.evidence)}</span>` : VK.pill('No evidence yet', 'warn')}</div></div>`));
+      + VK.list(t.drafts.map((d) => `<div class="vk-row-b"><div class="vk-row-t">${esc(d.q)}</div><div>${esc(VK.scrub(d.a))}</div><div class="vk-meta">${d.evidence ? `<span>Evidence: ${esc(VK.scrub(d.evidence))}</span>` : VK.pill('No evidence yet', 'warn')}</div></div>`));
   }
   function daBlock(c) {
     const d = c.da; if (!d) return '';
@@ -6170,6 +6358,10 @@ VIEWS.cases = () => CASES_BOARD.view();
     body += `<h3 class="cs-h3">Client decision</h3>` + (dec ? VK.facts([['Decision', esc(dec.choice === 'accept' ? 'Accept the assessment' : dec.choice === 'instruct' ? 'Instruct the firm to dispute it' : dec.choice)], ['When', VK.when(dec.at)], ['Note', dec.note ? esc(VK.scrub(dec.note)) : '<span class="muted">None</span>'], ['G14', VK.gateChip(c, 'G14')]])
       : '<p class="small muted">The client has not decided yet (PaperSync portal, simulated).</p>');
     const rem = c.remedy;
+    if (ENGINE.applies(c, 'G15') && !ENGINE.stepDone(c, 'G15')) {
+      body += `<div class="cs-remedy">${!rem ? `<p class="small">${esc('The client instructed the firm to act. The Tax Consultant chooses the remedy route and records the grounds and evidence; the client then authorises it in the PaperSync portal.')}</p>` : ''}`
+        + btn(rem ? 'Change the remedy or its evidence' : 'Choose the remedy', 'cases.remedy', { cls: 'sm' + (rem ? '' : ' primary'), data: { case: c.id }, lock: tcLock() }) + '</div>';
+    }
     if (rem) {
       const p = PERIODS[rem.route];
       body += `<h3 class="cs-h3">Remedy</h3>` + VK.facts([
@@ -6271,6 +6463,90 @@ VIEWS.cases = () => CASES_BOARD.view();
       const c = caseOf(t); if (!c) return;
       VK.done(ENGINE.approveNa(c, t.dataset.item, ACTOR.me()), 'Approved: the item is marked not available.');
     },
+    // Tick a gate checklist item (ENGINE.markReq), for example G02's comparison with the SARS registered details or G13's review.
+    'cases.req': (t) => {
+      const c = caseOf(t); if (!c) return;
+      const r = (c.req[t.dataset.gate] || []).find((x) => x.key === t.dataset.key);
+      if (!r) { toast('That checklist item is no longer on the case.'); render(); return; }
+      VK.done(ENGINE.markReq(c, t.dataset.gate, r.key, ACTOR.me()), 'Done: ' + r.label + ' (' + t.dataset.gate + ').');
+    },
+    // The values read from one checked document (ENGINE.setInputs): calculator field, reference and amount per value. The other
+    // documents' values are kept. A medical scheme certificate also gives the months on the scheme and the dependants.
+    'cases.values': (t) => {
+      const c = caseOf(t); if (!c) return;
+      const d = c.docs.find((x) => x.id === t.dataset.doc);
+      if (!d) { toast('That document is no longer on the case.'); render(); return; }
+      const fields = fieldsFor(d.kind); const all = ((c.inputs && c.inputs.lines) || []);
+      const mine = all.filter((l) => l.docId === d.id); const ROWS = Math.max(3, mine.length + 1);
+      const kindLabel = (DOC_KINDS.find((k) => k.kind === d.kind) || {}).label || 'document';
+      const med = (c.inputs && c.inputs.medical) || {};
+      const opt = (cur) => `<option value="">Choose the calculator field</option>` + fields.map((k) => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(CALC.FIELDS[k].label + ' (' + CALC.FIELDS[k].cat + ')')}</option>`).join('');
+      const row = (i) => { const l = mine[i] || {};
+        return `<fieldset class="cs-val"><legend class="small muted">${esc(l.id ? 'Value ' + l.id : 'New value')}</legend>
+          <label class="f" for="cs-v-f${i}">Calculator field<select id="cs-v-f${i}" name="f${i}">${opt(l.field)}</select></label>
+          <label class="f" for="cs-v-r${i}">Reference on the document<input id="cs-v-r${i}" name="r${i}" maxlength="120" autocomplete="off" value="${esc(l.ref || '')}" placeholder="For example IRP5 code 3601"></label>
+          <label class="f" for="cs-v-a${i}">Amount (rand)<input id="cs-v-a${i}" name="a${i}" inputmode="decimal" autocomplete="off" value="${l.amount == null ? '' : esc(l.amount)}"></label></fieldset>`; };
+      modal('Values from ' + kindLabel, `${VK.facts([['Case', VK.caseWho(c)], ['Document', esc(VK.scrub(d.name)) + ' · ' + docStatus(d)]])}
+        <div class="cs-vals">${Array.from({ length: ROWS }, (_, i) => row(i)).join('')}</div>
+        ${d.kind === 'medical' ? `<div class="cs-val-med"><label class="f" for="cs-v-months">Months on the medical scheme<input id="cs-v-months" name="months" inputmode="numeric" autocomplete="off" value="${esc(med.months == null ? 12 : med.months)}"></label>
+          <label class="f" for="cs-v-deps">Dependants on the scheme<input id="cs-v-deps" name="deps" inputmode="numeric" autocomplete="off" value="${esc(med.dependants == null ? 0 : med.dependants)}"></label></div>` : ''}
+        <p class="hint">${esc('You record them as ' + S.role + ' (' + me().name + '). Leave a row empty to drop it. The AI reading is simulated, so a person keys in what the document shows. Recalculate afterwards to use them.')}</p>`,
+      'Record values', (fd) => {
+        const used = new Set(all.filter((l) => l.docId !== d.id).map((l) => l.id));
+        let next = all.reduce((m, l) => Math.max(m, +(/^L(\d+)$/.exec(l.id) || [0, 0])[1]), 0);
+        const lines = [];
+        for (let i = 0; i < ROWS; i++) {
+          const f = String(fd['f' + i] || ''); const ref = String(fd['r' + i] || '').trim(); const raw = String(fd['a' + i] || '').replace(/[\sR,]/g, '');
+          if (!f && !ref && !raw) continue;
+          if (!fields.includes(f)) return 'Row ' + (i + 1) + ': choose the calculator field.';
+          if (raw === '' || !/^-?\d+(\.\d{1,2})?$/.test(raw)) return 'Row ' + (i + 1) + ': give the amount as a number, for example 455000 or 1234.56.';
+          const amount = Number(raw); const was = mine[i];
+          let id = was && was.id && !used.has(was.id) ? was.id : null;
+          if (!id) { do { next += 1; id = 'L' + next; } while (used.has(id)); }
+          used.add(id);
+          const line = { id, docId: d.id, ref: ref || CALC.FIELDS[f].label, field: f, amount };
+          if (was && was.decided && was.field === f && was.amount === amount) line.decided = was.decided;
+          lines.push(line);
+        }
+        const inputs = Object.assign({}, c.inputs || {}, { lines: all.filter((l) => l.docId !== d.id).concat(lines) });
+        if (d.kind === 'medical') {
+          const months = Number(fd.months); const deps = Number(fd.deps);
+          if (!Number.isInteger(months) || months < 0 || months > 12) return 'Months on the medical scheme: a whole number from 0 to 12.';
+          if (!Number.isInteger(deps) || deps < 0) return 'Dependants: a whole number, 0 or more.';
+          inputs.medical = Object.assign({}, inputs.medical || {}, { months, dependants: deps });
+        }
+        if (!inputs.medical) inputs.medical = { months: 0, dependants: 0 };
+        return finish(ENGINE.setInputs(c, ACTOR.me(), inputs, { note: 'Recorded the values read from the ' + kindLabel + ' (' + d.id + ')' }),
+          'Recorded ' + plural(lines.length, 'value') + ' from the ' + kindLabel + '. Recalculate to use them.');
+      });
+    },
+    // The remedy route after the client instructs the firm (ENGINE.chooseRemedy): the route, with its statutory deadline shown,
+    // and the grounds and evidence. Choosing again changes the route or updates the evidence.
+    'cases.remedy': (t) => {
+      const c = caseOf(t); if (!c) return;
+      const routes = REMEDY_FN.concat(['advice']); const cur = c.remedy ? c.remedy.route : '';
+      const opt = (r) => {
+        const label = r === 'advice' ? 'Documented advice, no SARS action' : SARS_FN[r].label;
+        const dl = r === 'advice' ? null : ENGINE.remedyDeadline(c, r); const p = PERIODS[r];
+        const note = r === 'advice' ? 'No SARS transaction: the advice is recorded and G15 passes on the Tax Consultant’s release.'
+          : (dl && dl.deadline ? 'Due ' + fDate(VK.toDay(dl.deadline)) + ': ' + p.days + ' business days from ' + dl.basis + ', 16 Dec to 15 Jan not counted (' + p.rule + ').'
+            : (dl && dl.basis ? VK.scrub(dl.basis) : 'No statutory deadline in the preview.')) + (SARS_FN[r].approved ? '' : ' Outside the SARS interface the documents assume: sending it raises INT-08.');
+        return `<label><input type="radio" name="route" value="${esc(r)}"${r === cur ? ' checked' : ''}> <span><strong>${esc(label)}</strong><br><span class="small muted">${esc(note)}</span></span></label>`;
+      };
+      modal((c.remedy ? 'Change the remedy for ' : 'Choose the remedy for ') + c.id, `${VK.facts([['Case', VK.caseWho(c)], ['Client decision', c.decision ? esc(c.decision.choice === 'instruct' ? 'Instructed the firm to dispute the assessment' : c.decision.choice) + (c.decision.note ? '<div class="small muted">' + esc(VK.scrub(c.decision.note)) + '</div>' : '') : '<span class="muted">None yet</span>']])}
+        <fieldset class="ops-radios"><legend class="small muted">Remedy route</legend>${routes.map(opt).join('')}</fieldset>
+        <label class="f" for="cs-rem-ev">Grounds and evidence (required)<textarea id="cs-rem-ev" name="evidence" maxlength="1000">${esc(c.remedy && c.remedy.evidence ? c.remedy.evidence : '')}</textarea></label>
+        <p class="hint">${esc('You choose as ' + S.role + ' (' + me().name + '). The client then authorises the route in the PaperSync portal (simulated); G15 and G18 follow before anything is sent to SARS, which is simulated too.')}</p>`,
+      'Choose remedy', (fd) => {
+        const route = String(fd.route || '');
+        if (!routes.includes(route)) return 'Choose a remedy route.';
+        const evidence = String(fd.evidence || '').trim();
+        if (!evidence) return 'Record the grounds and evidence.';
+        const r = ENGINE.chooseRemedy(c, ACTOR.me(), route, { evidence });
+        const label = route === 'advice' ? 'documented advice' : SARS_FN[route].label;
+        return finish(r, 'Chose the remedy: ' + label + (r && r.deadline ? ', due ' + fDate(VK.toDay(r.deadline)) : '') + '.');
+      });
+    },
   });
 })();
 
@@ -6279,7 +6555,8 @@ VIEWS.cases = () => CASES_BOARD.view();
    and a side-by-side comparison with the SARS registered details (G02, MD-* codes).
    This file also defines ADM, the few helpers the admin screens share (views-deadlines, views-controls, views-records and
    views-import): the Phase 1 field list, downloads, outside links and the modal result helper.
-   Views only read state: a KYC change goes through ENGINE.setKyc with ACTOR.me(), and ENGINE audits every refusal. */
+   Views only read state: a KYC change goes through ENGINE.setKyc with ACTOR.me(), and opening the year's ITR12 case through
+   ENGINE.newCase (an Administrator or a Tax Consultant); ENGINE audits every refusal. */
 const ADM = (() => {
   /* ---------- The Phase 1 field groups, as the master document lists them (Phase 1, step 1) ---------- */
   const P1 = ((WORKFLOW.phases.find((p) => p.n === 1) || { steps: [] }).steps[0]) || { groups: [], responsible: '', reviewer: '' };
@@ -6302,6 +6579,7 @@ const ADM = (() => {
     F('passport_country', 'Passport country', 0),
     F('passport_issue_date', 'Passport issue date', 0, { kind: 'date', hint: 'YYYY-MM-DD' }),
     F('nationality', 'Nationality or citizenship', 0),
+    F('foreign_tax_info', 'Relevant foreign tax information', 0, { hint: 'For a client with no RSA ID number' }),
     F('email', 'Email address', 1, { kind: 'email' }),
     F('mobile', 'Cell or mobile number', 1, { kind: 'phone', hint: 'For example 082 123 4567 or +27 82 123 4567' }),
     F('home_phone', 'Home telephone', 1, { kind: 'phone' }),
@@ -6327,10 +6605,12 @@ const ADM = (() => {
     F('foreign_tin', 'Foreign tax identification number', 4, { mask: 'tail' }),
     F('account_holder', 'Account-holder legal name', 5),
     F('bank', 'Bank', 5),
+    F('branch', 'Branch', 5),
     F('branch_code', 'Branch code', 5, { kind: 'branch', hint: '6 digits' }),
     F('account_number', 'Account number', 5, { kind: 'account', mask: 'tail' }),
     F('account_type', 'Account type', 5),
     F('held_by_taxpayer', 'Account held by the taxpayer', 5, { kind: 'yesno' }),
+    F('details_agree_sars', 'Details agree with SARS', 5, { kind: 'yesno', hint: 'Whether these details agree with what SARS holds' }),
     F('provisional', 'Provisional taxpayer', 6, { kind: 'yesno', hint: 'Sets the filing-season deadline; not a Phase 1 item' }),
   ];
   const GROUP_LABEL = (g) => (GROUPS[g] ? GROUPS[g].title : 'Added by the preview');
@@ -6544,6 +6824,13 @@ const ADM = (() => {
       intro: esc('Side by side: what the client record holds and what the simulated SARS link returned. The comparison items are the ones Phase 3 lists. A difference is an MD code that the Tax Consultant clears before G02 can pass.'),
     });
   }
+  // Opening the year's ITR12 case: an Administrator or a Tax Consultant, once per client and tax year.
+  const OPENERS = ['Administrator', 'Tax Consultant'];
+  function openCaseBtn(cl) {
+    const year = FILING_2026.year;
+    if (caseOfClient(cl).some((c) => c.year === year)) return '';
+    return btn('Open the ' + year + ' ITR12 case', 'adm.newCase', { cls: 'sm primary', data: { client: cl.id }, lock: OPENERS.includes(S.role) ? null : 'Administrator or Tax Consultant only' });
+  }
   function casesBlock(cl) {
     const rows = caseOfClient(cl).map((c) => {
       const col = BOARD.find((b) => b.key === ENGINE.columnOf(c)); const g = ENGINE.currentGate(c);
@@ -6551,8 +6838,10 @@ const ADM = (() => {
       return [VK.caseLink(c), esc(c.year), esc(col ? col.label : ''), g ? VK.gateChip(c, g) : VK.pill('All gates passed', 'ok'),
         open.length ? `<div class="vk-codes">${open.map((x) => VK.codeChip(x.code, x)).join(' ')}</div>` : '<span class="muted">None</span>'];
     });
+    const open = openCaseBtn(cl);
     return VK.section('adm-client-cases', 'Annual ITR12 cases', VK.table([{ label: 'Case' }, { label: 'Year' }, { label: 'Stage' }, { label: 'Current gate' }, { label: 'Open exceptions' }], rows,
-      { caption: 'ITR12 cases for ' + cl.name, empty: 'No ITR12 case yet.' }), { count: rows.length, intro: esc('Each tax year is a separate case in the annual case repository.') });
+      { caption: 'ITR12 cases for ' + cl.name, empty: 'No ITR12 case yet.' }) + (open ? `<div class="adm-gateline"><span class="small muted">${esc('The ' + FILING_2026.year + ' year of assessment (' + FILING_2026.period + ') has no case yet.')}</span>${open}</div>` : ''),
+    { count: rows.length, intro: esc('Each tax year is a separate case in the annual case repository. An Administrator or a Tax Consultant opens it; G01 then waits for the KYC documents.') });
   }
   function activityBlock(cl) {
     const items = S.audit.filter((a) => a.client === cl.id || a.who === cl.id).slice(-12).reverse().map(ADM.auditRow);
@@ -6569,6 +6858,24 @@ const ADM = (() => {
 
   /* ---------- Actions ---------- */
   Object.assign(ACT, {
+    'adm.newCase': (t) => {
+      const cl = ENGINE.clientOf(t.dataset.client); if (!cl) { toast('That client is no longer here.'); render(); return; }
+      const year = FILING_2026.year;
+      if (caseOfClient(cl).some((c) => c.year === year)) { toast('Not done: ' + cl.name + ' already has a ' + year + ' ITR12 case.'); render(); return; }
+      const tcs = S.people.filter((p) => p.role === 'Tax Consultant');
+      const mine = S.role === 'Tax Consultant' ? me().id : (tcs[0] ? tcs[0].id : 'TC1');
+      modal('Open the ' + year + ' ITR12 case', `${VK.facts([['Client', esc(cl.id + ' · ' + cl.name)], ['Year of assessment', esc(year + ' (' + FILING_2026.period + ')')], ['Filing', esc(cl.provisional ? 'Provisional taxpayer' : 'Not a provisional taxpayer')]])}
+        <label class="f" for="adm-nc-tc">Tax Consultant<select id="adm-nc-tc" name="consultant">${tcs.map((p) => `<option value="${esc(p.id)}"${p.id === mine ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        <p class="hint">${esc('You open it as ' + S.role + ' (' + me().name + '). The case starts at G01 (the KYC documents), then the SARS details check (G02) and the client’s questionnaire in the PaperSync portal (simulated). Operon records it in the audit trail.')}</p>`,
+      'Open the case', (fd) => {
+        if (!OPENERS.includes(S.role)) return 'Not done: only an Administrator or a Tax Consultant opens a case.';
+        if (caseOfClient(cl).some((c) => c.year === year)) return 'Not done: ' + cl.name + ' already has a ' + year + ' ITR12 case.';
+        const consultant = tcs.some((p) => p.id === fd.consultant) ? String(fd.consultant) : mine;
+        const c = ENGINE.newCase(cl, { year, consultant }, ACTOR.me());
+        if (!c || c.ok === false || !c.id) return 'Not done: ' + ((c && c.why) || 'Operon refused this.');
+        return () => VK.done({ ok: true }, 'Opened ' + c.id + ', the ' + year + ' ITR12 case for ' + cl.name + '.');
+      });
+    },
     'adm.kyc': (t) => {
       const cl = ENGINE.clientOf(t.dataset.client); if (!cl) { toast('That client is no longer here.'); render(); return; }
       const k = cl.kyc.find((x) => x.key === t.dataset.key); if (!k) return;
@@ -6581,7 +6888,7 @@ const ADM = (() => {
 })();
 
 /* ===================== itr12/views-approvals.js ===================== */
-/* Approvals: every gate waiting for the signed-in role (this replaces the old sign-off and lodge trays), the G18 two-person
+/* Approvals: every gate waiting for the signed-in role, the G18 two-person
    sign-offs on the simulated SARS link, and the severity and override requests the Records/Compliance Owner approves.
    Read-only: releases and G18 sign-offs use the kit's shared actions (ACT 'vk.release'); the request buttons use 'ops.sevOk' and
    'ops.ovOk' (views-exceptions.js), which call ENGINE with ACTOR.me(). */
@@ -6696,7 +7003,7 @@ const ADM = (() => {
 
   VIEWS.approvals = () => {
     const role = S.role;
-    const intro = `${esc(role)} · ${esc(me().name)}. ` + esc('Every gate waiting for your role, with its criteria and what still blocks it. This replaces the old sign-off and lodge trays.');
+    const intro = `${esc(role)} · ${esc(me().name)}. ` + esc('Every gate waiting for your role, with its criteria and what still blocks it.');
     return VK.page('Approvals', intro, gatesBlock(role) + g18Block(role) + requestsBlock(role) + whoBlock(role), { key: 'ops-approvals' });
   };
 })();
@@ -6849,8 +7156,10 @@ const ADM = (() => {
     let act = '';
     if (ENGINE.isOpen(x)) act = VK.exceptionBtn({ x, need: 'resolve' });
     else if (x.status === 'resolved' && x.secondary) act = VK.exceptionBtn({ x, need: 'close' });
+    const plat = /^Platform /.test(x.owner) || /^Platform /.test(x.secondary || '');
     return VK.section('ops-exception-resolution', 'Resolution and secondary review', VK.facts(pairs) + (act ? `<div class="row">${act}</div>` : ''), {
-      intro: esc(x.secondary ? 'The owner resolves it; then a different person in the ' + x.secondary + ' role closes it. It keeps blocking until it is closed.' : 'The owner resolves it. Codes with no secondary reviewer close when their gates are done.'),
+      intro: esc((x.secondary ? 'The owner resolves it; then a different person in the ' + x.secondary + ' role closes it. It keeps blocking until it is closed.' : 'The owner resolves it. Codes with no secondary reviewer close when their gates are done.')
+        + (plat ? ' The register gives part of this to the platform team, which works outside the firm: the preview simulates it, and records the platform team, not you.' : '')),
     });
   }
   function severityBlock(x) {
@@ -6864,7 +7173,7 @@ const ADM = (() => {
       else btns.push(`<span class="lock">${I.hourglass}${esc('Waiting for the Records/Compliance Owner')}</span>`);
     }
     return VK.section('ops-exception-severity', 'Severity', VK.facts(pairs) + (btns.length ? `<div class="row ops-btns">${btns.join('')}</div>` : ''), {
-      intro: esc('S1 is a hard stop for the case; S2 blocks its gates; S3 blocks only the affected item; S4 is logged. Anyone may raise a severity at once. Lowering an S1 or S2 needs the Records/Compliance Owner’s approval, by a different person.'),
+      intro: esc('S1 is a hard stop for the whole case. Otherwise the register’s Blocking column decides: a blocking code stops the gates it is mapped to, whether it is S2 or S3. Anyone may raise a severity at once. Lowering an S1 or S2 needs the Records/Compliance Owner’s approval, by a different person.'),
     });
   }
   function overrideBlock(x) {
@@ -6889,7 +7198,7 @@ const ADM = (() => {
     const fb = x.fallback;
     if (!fb) return VK.section('ops-exception-fallback', 'Manual fallback', VK.empty(x.code + ' is not a Conditional code, so it has no manual fallback. Only ' + CONDITIONAL.join(', ') + ' have one.'));
     const rec = fb.recorded; const rcn = fb.reconciled;
-    const pairs = [['Recorded', rec ? `${esc(VK.who(rec.by))} · ${VK.when(rec.at)}${rec.ref ? ` · <span class="mono">${esc(rec.ref)}</span>` : ''}${rec.note ? `<div class="small muted">${esc(VK.scrub(rec.note))}</div>` : ''}` : '<span class="muted">Not yet</span>'],
+    const pairs = [['Recorded', rec ? `${esc(VK.who(rec.by))} · ${VK.when(rec.at)}${rec.ref ? ` · <span class="mono">${esc(VK.scrub(rec.ref))}</span>` : ''}${rec.note ? `<div class="small muted">${esc(VK.scrub(rec.note))}</div>` : ''}` : '<span class="muted">Not yet</span>'],
       ['Independently reconciled', rcn ? `${esc(VK.who(rcn.by))} · ${VK.when(rcn.at)}${rcn.found === false ? ' · ' + esc('not processed') : ''}${rcn.note ? `<div class="small muted">${esc(VK.scrub(rcn.note))}</div>` : ''}` : '<span class="muted">Not yet</span>']];
     // Only AI-06 records a free-text fallback. The others have a real fallback action: the manual filing on the SARS link page
     // (INT-03, INT-13) or confirming the dates from the notice (INT-15). A free-text note must not stand in for those.
@@ -6988,7 +7297,7 @@ const ADM = (() => {
     const tx = x.code === 'INT-13' && x.txId ? ENGINE.txById(x.txId) : null;
     const rec = x.fallback && x.fallback.recorded;
     modal('Reconcile the fallback for ' + x.id, `${head(x)}
-      ${rec ? VK.facts([['Recorded by', esc(VK.who(rec.by))], ['Reference', esc(rec.ref || 'None')], ['Note', esc(VK.scrub(rec.note || ''))]]) : ''}
+      ${rec ? VK.facts([['Recorded by', esc(VK.who(rec.by))], ['Reference', esc(VK.scrub(rec.ref || 'None'))], ['Note', esc(VK.scrub(rec.note || ''))]]) : ''}
       ${tx ? `<fieldset class="ops-radios"><legend class="small muted">What the eFiling record shows (simulated)</legend>
         <label><input type="radio" name="processed" value="yes" checked> The manual filing is on eFiling: reconcile it to the case</label>
         <label><input type="radio" name="processed" value="no"> It is not on eFiling: mark ${esc(tx.id)} as not processed</label></fieldset>` : ''}
@@ -7057,7 +7366,8 @@ const ADM = (() => {
 /* SARS link (simulated): the link's status, the transaction log (S.txs) with each open transaction's eight G18 checks and blockers,
    the two-person sign-off, sending with a chosen simulated outcome, the no-blind-retry rule (check the status before any retry,
    INT-04), the manual fallback (INT-13) and its independent reconciliation, and the inbound items (S.inbound) with routing and
-   date confirmation. Nothing here connects to SARS. Every button calls ENGINE with ACTOR.me(); a refusal shows ENGINE's reason.
+   date confirmation, and "Simulate SARS sending an ITA34" for a submitted return (ENGINE.receive: SARS acts, not the signed-in
+   person). Nothing here connects to SARS. Every other button calls ENGINE with ACTOR.me(); a refusal shows ENGINE's reason.
    Locked buttons say which role acts; ENGINE checks the role again whatever the screen shows. */
 (() => {
   const finish = (r, msg) => (r && r.ok ? () => VK.done(r, msg) : 'Not done: ' + ((r && r.why) || 'Operon refused this.'));
@@ -7131,7 +7441,7 @@ const ADM = (() => {
     const result = (t) => {
       const parts = [];
       if (t.ref) parts.push(`<div class="small">Reference <span class="mono">${esc(t.ref)}</span></div>`);
-      if (t.manual) parts.push(`<div class="small">Manual reference <span class="mono">${esc(t.manual.ref)}</span> · ${esc(VK.who(t.manual.by))}</div>`);
+      if (t.manual) parts.push(`<div class="small">Manual reference <span class="mono">${esc(VK.scrub(t.manual.ref))}</span> · ${esc(VK.who(t.manual.by))}</div>`);
       if (t.attempts.length) parts.push(`<div class="small muted">${esc(plural(t.attempts.length, 'send'))}, last ${VK.when(t.attempts[t.attempts.length - 1].at)}</div>`);
       if (t.parentTx) parts.push(`<div class="small muted">Retry of ${esc(t.parentTx)}</div>`);
       return parts.join('');
@@ -7192,11 +7502,17 @@ const ADM = (() => {
       items.map((it) => [`${esc(it.label)} <span class="mono small">${esc(it.ref || it.id)}</span><div class="small muted">${esc(it.id)} · received ${VK.when(it.at)} · hash <span class="mono">${esc(String(it.hash || '').slice(0, 12))}…</span></div>`,
         who(it), where(it), dates(it), iacts(it)]),
       { caption: 'Inbound items from SARS (simulated)', empty: 'Nothing has arrived from SARS.' });
+    const waiting = awaitingIta34();
     return VK.section('ops-sars-inbound', 'Inbound from SARS', table, {
       count: items.filter((it) => it.status === 'unrouted').length || null,
-      intro: esc('Notices, assessments and requests, newest first. Each is hashed and matched to a case by tax reference and year; one that matches no case raises INT-14 and waits for the Integration Administrator. An unreadable date is never guessed (INT-15).'),
+      intro: esc('Notices, assessments and requests, newest first. Each is hashed and matched to a case by tax reference and year; one that matches no case raises INT-14 and waits for the Integration Administrator. An unreadable date is never guessed (INT-15). '
+        + (waiting.length ? plural(waiting.length, 'submitted return') + ' ' + (waiting.length === 1 ? 'waits' : 'wait') + ' for SARS’s assessment: “Simulate SARS sending an ITA34” plays SARS’s part.' : 'No submitted return is waiting for SARS’s assessment.')),
+      actions: waiting.length ? btn('Simulate SARS sending an ITA34', 'ops.in.ita34', { cls: 'sm', id: 'ops-sim-ita34' }) : '',
     });
   }
+
+  // Submitted returns with no assessment yet: the ones the simulated SARS can send an ITA34 for.
+  const awaitingIta34 = () => S.cases.filter((c) => !c.archived && c.submission && c.submission.ok && !c.ita34 && !c.pendingIta34 && c.calc && c.calc.summary);
 
   /* ---------- the rules on this link ---------- */
   function rulesBlock() {
@@ -7282,7 +7598,40 @@ const ADM = (() => {
       <label class="f" for="ops-in-due">Due date (if any)<input id="ops-in-due" name="due" type="date" value="${esc(it.due || '')}"></label>`,
     'Confirm dates', (fd) => finish(ENGINE.confirmInboundDate(it, ACTOR.me(), { date: String(fd.date || ''), due: String(fd.due || '') }), 'Confirmed the dates on ' + it.id + '.'));
   }
-  Object.assign(ACT, { 'ops.link': actLink, 'ops.tx.send': actSend, 'ops.tx.check': actCheck, 'ops.tx.retry': actRetry, 'ops.tx.manual': actManual, 'ops.in.route': actRoute, 'ops.in.date': actDate });
+  // The simulated SARS issues the assessment (ITA34) for a submitted return: the firm's approved figures, or with one figure
+  // changed to show a difference (ASM-02). ENGINE.receive records SARS as the actor and routes it to the case by tax reference and year.
+  function actIta34(t) {
+    const cases = awaitingIta34();
+    if (!cases.length) { toast('No submitted return is waiting for an assessment.'); render(); return; }
+    const pre = cases.find((c) => c.id === (t.dataset.case || '')) || cases[0];
+    const today = ENGINE.isoDay(now());
+    modal('Simulate SARS sending an ITA34', `<p class="note">${esc('This plays SARS’s part: nothing is received from SARS. Operon records it as SARS (simulated) and compares it figure by figure with the approved calculation (G12).')}</p>
+      <label class="f" for="ops-ita-case">Submitted return<select id="ops-ita-case" name="case">${cases.map((c) => `<option value="${esc(c.id)}"${c === pre ? ' selected' : ''}>${esc(c.id + ' · ' + VK.clientName(c.clientId) + ' · ' + c.year + ' · reference ' + c.submission.ref)}</option>`).join('')}</select></label>
+      <label class="f" for="ops-ita-date">Date of assessment<input id="ops-ita-date" name="date" type="date" value="${esc(today)}"></label>
+      <fieldset class="ops-radios"><legend class="small muted">What SARS assesses (simulated)</legend>
+        <label><input type="radio" name="how" value="same" checked> <span><strong>The firm’s approved figures</strong><br><span class="small muted">The assessment agrees with the approved calculation.</span></span></label>
+        <label><input type="radio" name="how" value="diff"> <span><strong>One figure differs</strong><br><span class="small muted">${esc('SARS uses a different amount for the figure below; a difference over ' + CALC.rand(S.policy.materiality.amount) + ' raises ASM-02.')}</span></span></label></fieldset>
+      <div class="ops-ita-diff"><label class="f" for="ops-ita-field">Figure that differs<select id="ops-ita-field" name="field">${ITA34_FIELDS.map((f) => `<option value="${esc(f.key)}">${esc(f.label)}</option>`).join('')}</select></label>
+      <label class="f" for="ops-ita-amount">SARS’s amount (rand)<input id="ops-ita-amount" name="amount" inputmode="decimal" autocomplete="off"></label></div>`,
+    'Send the ITA34 (simulated)', (fd) => {
+      const c = cases.find((x) => x.id === String(fd.case || ''));
+      if (!c || !awaitingIta34().includes(c)) return 'Pick a submitted return that has no assessment yet.';
+      const date = String(fd.date || '');
+      if (!DATES.dt(date)) return 'Give the date of assessment.';
+      const data = Object.assign({}, c.calc.summary);
+      if (fd.how === 'diff') {
+        const key = String(fd.field || ''); const raw = String(fd.amount || '').replace(/[\sR,]/g, '');
+        if (!ITA34_FIELDS.some((f) => f.key === key)) return 'Choose the figure that differs.';
+        if (!/^-?\d+(\.\d{1,2})?$/.test(raw)) return 'Give SARS’s amount as a number, for example 498000.';
+        data[key] = Number(raw);
+      }
+      const n = S.inbound.filter((it) => it.fn === 'ita34').length + 1;
+      const it = ENGINE.receive({ fn: 'ita34', taxRef: ENGINE.clientOf(c).taxRef, year: c.year, ref: 'ITA34-SIM-' + c.id + '-' + n, date, data, submissionRef: c.submission.ref });
+      const ok = !!(it && it.caseId === c.id && c.ita34 && c.ita34.ref === it.ref);
+      return finish({ ok, why: ok ? '' : 'The simulated ITA34 did not reach ' + c.id }, 'SARS (simulated) sent ITA34 ' + it.ref + ' for ' + c.id + (ok && !c.ita34.recon.ok ? ': it differs from the approved calculation (ASM-02).' : ': it agrees with the approved calculation.'));
+    });
+  }
+  Object.assign(ACT, { 'ops.in.ita34': actIta34, 'ops.link': actLink, 'ops.tx.send': actSend, 'ops.tx.check': actCheck, 'ops.tx.retry': actRetry, 'ops.tx.manual': actManual, 'ops.in.route': actRoute, 'ops.in.date': actDate });
 
   // Header count: transactions whose outcome is in doubt, and inbound items no case has claimed.
   NAV_COUNT.sars = () => S.txs.filter((t) => ['unknown', 'no-response', 'manual'].includes(t.status)).length + S.inbound.filter((it) => it.status === 'unrouted').length;
@@ -7448,7 +7797,7 @@ const ADM = (() => {
     else if (C.res) {
       const ex = C.res.rows.filter((r) => !r.business);
       countRes = `<div class="adm-result" role="status"><p class="adm-big">${esc(plural(C.res.business, 'business day'))}</p><p class="small muted">${esc(plural(C.res.total, 'calendar day') + ' counted, ' + C.res.excluded + ' excluded.')}</p>
-        ${ex.length ? `<details><summary>Excluded days (${ex.length})</summary><ul class="adm-days">${ex.slice(0, 120).map((r) => `<li><span class="mono">${esc(r.date)}</span> ${esc(r.reason)}</li>`).join('')}</ul>${ex.length > 120 ? '<p class="small muted">First 120 shown.</p>' : ''}</details>` : ''}</div>`;
+        ${ex.length ? `<details><summary>Excluded days (${ex.length})</summary><ul class="adm-days">${ex.slice(0, 120).map((r) => `<li><span class="mono">${VK.date(r.date)}</span> ${esc(r.reason)}</li>`).join('')}</ul>${ex.length > 120 ? '<p class="small muted">First 120 shown.</p>' : ''}</details>` : ''}</div>`;
     }
     let addRes = '';
     if (A.err) addRes = `<p class="err">${esc(A.err)}</p>`;
@@ -8043,17 +8392,21 @@ const ADM = (() => {
     const to = BOARD[i + 1] ? BOARD[i + 1] : null;
     const n0 = S.audit.length;
     const r = ENGINE.dragForward(c, ACTOR.me(), to ? to.key : null);
+    // A role that does not own the gate is refused for that reason alone, which hides the codes this scenario is about. So the
+    // simulated Tax Consultant, who owns G02, tries the same drag too: that refusal names the blocking codes.
+    const tcToo = !r.ok && S.role !== 'Tax Consultant' ? ENGINE.dragForward(c, ACTOR.as('Tax Consultant', c.consultant), to ? to.key : null) : null;
     const logged = S.audit.slice(n0).filter((a) => a.result === 'Refused').length;
-    const bl = (r.blockers || []).filter((x) => x && x.code);
+    const bl = ((r.blockers && r.blockers.length ? r.blockers : (tcToo && tcToo.blockers) || [])).filter((x) => x && x.code);
     const fromL = (BOARD[i] || {}).label || from;
-    if (r.ok) {
-      return { tone: 'ok', head: 'It moved: nothing blocked ' + c.id + ' any more.', lines: [`You (${esc(you())}) dragged ${VK.caseWho(c)} from ${esc(fromL)} towards ${esc(to ? to.label : 'the next column')}. Every check passed, so Operon released the gate and recorded it.`], links: [VK.caseLink(c), go('cases', 'Cases board'), go('audit', 'Audit trail')] };
+    if (r.ok || (tcToo && tcToo.ok)) {
+      return { tone: 'ok', head: 'It moved: nothing blocked ' + c.id + ' any more.', lines: [`${r.ok ? 'You (' + esc(you()) + ')' : 'The Tax Consultant (simulated)'} dragged ${VK.caseWho(c)} from ${esc(fromL)} towards ${esc(to ? to.label : 'the next column')}. Every check passed, so Operon released the gate and recorded it.`], links: [VK.caseLink(c), go('cases', 'Cases board'), go('audit', 'Audit trail')] };
     }
     return {
-      tone: 'stop', head: 'Refused: ' + r.why,
+      tone: 'stop', head: 'Refused: ' + (tcToo ? tcToo.why : r.why),
       lines: [`You (${esc(you())}) dragged ${VK.caseWho(c)} from ${esc(fromL)} to ${esc(to ? to.label : 'the next column')} on the Cases board. A forward drag is a request to release the gate.`,
-        `Operon refused it and the card snapped back: ${esc(r.why)}${bl.length ? ' ' + chips(bl) : ''}`,
-        esc(plural(logged, 'refusal') + ' written to the audit trail. Nothing changed on the case.')],
+        `Operon refused it and the card snapped back: ${esc(r.why)}${!tcToo && bl.length ? ' ' + chips(bl) : ''}`,
+        tcToo ? `The Tax Consultant (simulated), who owns G02, tried the same drag. Refused: ${esc(tcToo.why)}${bl.length ? ' ' + chips(bl) : ''}` : '',
+        esc(plural(logged, 'refusal') + ' written to the audit trail. Nothing changed on the case.')].filter(Boolean),
       links: [VK.caseLink(c, 'Case ' + c.id), go('cases', 'Cases board')].concat(bl.slice(0, 2).map((x) => VK.exLink(x, x.code + ' ' + x.id)), [go('audit', 'Audit trail')]),
     };
   }
@@ -8134,7 +8487,7 @@ const ADM = (() => {
       lines: ['The platform team (simulated) restored ruleset 2026.1. Each case with a calculation keeps or gets AI-07 as an impact check until it is rerun.',
         out.length ? 'The AI (simulated) reran each affected calculation:' : 'No case needed a rerun.',
         ...out.map((o) => `${VK.caseWho(o.c)}: ${o.k.ok ? esc('version ' + o.k.version + ' on 2026.1') + (ENGINE.currentApproval(o.c) ? '' : esc(o.c.approval ? ', so the client must approve again' : '')) : 'refused: ' + esc(o.k.why)}`),
-        esc(plural(open.length, 'AI-07 or TAX-06 exception') + ' stay open until their owners resolve them on Exceptions; where the rerun worked, their checks now pass.')],
+        esc(plural(open.length, 'AI-07 or TAX-06 exception') + ' stay open until their owners resolve them on each case or exception page; where the rerun worked, their checks now pass. The Tax Consultant resolves TAX-06 first. The platform team’s part (resolving AI-07, closing TAX-06) is simulated: its buttons say “as the simulated platform team”.')],
       links: [go('exceptions', 'Exceptions'), go('cases', 'Cases board'), go('audit', 'Audit trail')],
     };
   }
@@ -8240,7 +8593,10 @@ const ADM = (() => {
   /* ---------- Templates ---------- */
   const fmtOf = (f) => ({ date: 'Date, YYYY-MM-DD', id: '13 digits', taxref: '10 digits', email: 'Email address', phone: 'Phone number', yesno: 'Yes or No',
     postcode: '4 digits', branch: '6 digits', account: 'Digits', choice: 'One of: ' + (f.choices || []).join(', ') }[f.kind] || 'Text');
-  const reqOf = (f) => (f.req || f.key === 'id_number' || f.key === 'tax_ref' ? 'Required' : (f.key === 'provisional' ? 'Recommended (blank counts as No)' : 'Optional'));
+  const reqOf = (f) => (f.req || f.key === 'tax_ref' ? 'Required'
+    : f.key === 'id_number' ? 'Required, or the passport number with the date of birth'
+      : f.key === 'date_of_birth' ? 'Required when there is no RSA ID number'
+        : f.key === 'provisional' ? 'Recommended (blank counts as No)' : 'Optional');
   const csvCell = (v) => { const s = String(v == null ? '' : v); return /[",\r\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const csvTemplate = () => '﻿' + FIELDS.map((f) => csvCell(f.label)).join(',') + '\r\n';
 
@@ -8364,8 +8720,14 @@ const ADM = (() => {
         default: break;
       }
     });
-    if (!v.id_number && !v.passport_number) errors.push('RSA ID number is required.');
-    else if (!v.id_number) errors.push('The preview’s client record needs an RSA ID number; passport-only clients are not supported yet.');
+    // Phase 1: a client with no RSA ID gives the passport number, issue date and country, nationality and relevant foreign tax
+    // information. The date of birth is required then, because the age sets the rebates and the ID number cannot give it.
+    if (!v.id_number && !v.passport_number) errors.push('RSA ID number is required, or the passport number for a client without one.');
+    else if (!v.id_number) {
+      if (!v.date_of_birth) errors.push('Date of birth is required for a client with no RSA ID number.');
+      const gaps = ['passport_issue_date', 'passport_country', 'nationality', 'foreign_tax_info'].filter((k) => !v[k]).map((k) => BY[k].label.toLowerCase());
+      if (gaps.length) warnings.push('No RSA ID number: Phase 1 also asks for the ' + gaps.join(', ') + '.');
+    }
     if (!v.tax_ref) errors.push('Income tax reference number is required.');
     if (!v.provisional) warnings.push('Provisional taxpayer is blank: treated as No, which uses the earlier filing deadline.');
     if (v.id_number && v.date_of_birth && ADM.dobFromId(v.id_number) && ADM.dobFromId(v.id_number) !== v.date_of_birth) errors.push('Date of birth does not match the ID number.');
@@ -8373,9 +8735,10 @@ const ADM = (() => {
     if (!v.street && !v.city) warnings.push('No residential address yet: it is needed before G01 (KYC-01).');
     if (!v.bank && !v.account_number) warnings.push('No banking details yet: they are needed before G01 (KYC-01).');
     // Duplicates: against the client master, then within the file.
-    const dupe = S.clients.find((c) => (v.id_number && c.idNo === v.id_number) || (v.tax_ref && c.taxRef === v.tax_ref));
+    const dupe = S.clients.find((c) => (v.id_number && c.idNo === v.id_number) || (v.tax_ref && c.taxRef === v.tax_ref)
+      || (!v.id_number && v.passport_number && c.master && c.master.passport_number === v.passport_number));
     if (dupe) errors.push('Already in the client master as ' + dupe.id + '.');
-    ['id_number', 'tax_ref'].forEach((k) => { if (!v[k]) return; const was = seen[k + '|' + v[k]]; if (was) errors.push(BY[k].label + ' is the same as on line ' + was + '.'); else seen[k + '|' + v[k]] = line; });
+    ['id_number', 'tax_ref', 'passport_number'].forEach((k) => { if (!v[k]) return; const was = seen[k + '|' + v[k]]; if (was) errors.push(BY[k].label + ' is the same as on line ' + was + '.'); else seen[k + '|' + v[k]] = line; });
     return { line, v, errors, warnings, name: [v.first_name, v.surname].filter(Boolean).join(' ') };
   }
   function check(text, source) {
@@ -8420,7 +8783,8 @@ const ADM = (() => {
     const ready = R.rows.filter((r) => !r.errors.length); const bad = R.rows.length - ready.length;
     const msg = (r) => `${r.errors.map((t) => `<div class="adm-msg bad">${I.alert}<span>${esc(t)}</span></div>`).join('')}${r.warnings.map((t) => `<div class="adm-msg warn">${I.clock}<span>${esc(t)}</span></div>`).join('')}${!r.errors.length && !r.warnings.length ? '<span class="muted">No problems</span>' : ''}`;
     const rows = R.rows.map((r) => ({ cls: r.errors.length ? 'adm-diff' : '', cells: [esc(r.line), `<strong>${esc(r.name || '(no name)')}</strong>`,
-      r.v.id_number ? `${VK.idHtml(r.v.id_number)}<div class="small">${r.v.tax_ref ? VK.taxRefHtml(r.v.tax_ref) : '<span class="muted">No tax reference</span>'}</div>` : '<span class="muted">No ID number</span>',
+      (r.v.id_number ? VK.idHtml(r.v.id_number) : r.v.passport_number ? `<span class="small muted">Passport</span> <span class="mono vk-masked" title="Passport number, masked: only the last 4 characters show">${esc(VK.maskTaxRef(r.v.passport_number))}</span>` : '<span class="muted">No ID number</span>')
+        + `<div class="small">${r.v.tax_ref ? VK.taxRefHtml(r.v.tax_ref) : '<span class="muted">No tax reference</span>'}</div>`,
       r.errors.length ? VK.pill('Will be skipped', 'bad') : (r.warnings.length ? VK.pill('Ready, with warnings', 'warn') : VK.pill('Ready', 'ok')), msg(r)] }));
     const lock = isAdmin() ? null : LOCK_WHY;
     const create = ready.length ? btn('Create ' + plural(ready.length, 'client'), 'adm.impCreate', { cls: 'primary', lock }) : '';
@@ -8459,7 +8823,8 @@ const ADM = (() => {
         const ids = [];
         ready.forEach((r) => {
           const v = r.v; const master = {}; FIELDS.forEach((f) => { if (v[f.key]) master[f.key] = v[f.key]; });
-          const cl = ENGINE.newClient({ name: [v.first_name, v.surname].filter(Boolean).join(' '), idNo: v.id_number, taxRef: v.tax_ref, provisional: v.provisional === 'Yes',
+          // A passport-only client keeps no ID number (idNo null); the date of birth comes from the row.
+          const cl = ENGINE.newClient({ name: [v.first_name, v.surname].filter(Boolean).join(' '), idNo: v.id_number || null, dob: v.date_of_birth || null, taxRef: v.tax_ref, provisional: v.provisional === 'Yes',
             email: v.email || null, kyc: Object.fromEntries(ENGINE.KYC_ITEMS.map((k) => [k.key, false])), master }, ACTOR.me());  // the engine refuses anyone but an Administrator
           if (cl && cl.id && cl.ok !== false) ids.push(cl.id);
         });
@@ -8505,6 +8870,11 @@ const ADM = (() => {
     return (Math.round(n / 104857.6) / 10) + ' MB';
   }
   const released = (c, g) => c.gates[g] && c.gates[g].status === 'released';
+  // The questionnaire was sent but G03 has not passed (for example it was held for QUE exceptions): the client can check the
+  // answers and send them again. resendReady: nothing the firm is checking still stands in the way, so it is the client's turn.
+  const resendable = (c) => c.questionnaire.status === 'submitted' && !released(c, 'G03');
+  const resendReady = (c) => resendable(c) && ENGINE.canRelease(c, 'G03', ACTOR.client(c.clientId, 'portal')).ok;
+  const FIRM_CHECKING = 'Your accountant is checking something before this step completes.';
   const live = () => S.cases.filter((c) => !c.archived);
   const portalLink = (c, label, cls) => VK.link('portal', c.id, label || 'Open portal', cls ? { cls } : null);
   const simLink = (c) => 'SIMULATED-PORTAL:' + c.id;
@@ -8529,6 +8899,8 @@ const ADM = (() => {
     if (!released(c, 'G03') && q.status !== 'submitted') {
       const n = q.required.filter((k) => k in q.answers).length;
       out.push({ col: 'questionnaire', text: 'Questionnaire: ' + n + ' of ' + q.required.length + ' required answers' });
+    } else if (resendReady(c)) {
+      out.push({ col: 'questionnaire', text: 'Questionnaire: check the answers and send them again' });
     }
     // Documents are asked for once the questionnaire is in, because a Yes adds to the checklist (the portal's steps say the same).
     if (!released(c, 'G04') && q.status === 'submitted') {
@@ -8588,7 +8960,7 @@ const ADM = (() => {
       const cases = S.cases.filter((c) => c.clientId === cl.id && !c.archived);
       const c = cases.find((x) => !released(x, 'G01')) || cases[0];
       rows.push([`${VK.clientLink(cl)}<div class="small">${cases.length ? cases.map((x) => VK.caseLink(x)).join(', ') : '<span class="muted">No case</span>'}</div>`,
-        `<ul class="ps-kyc">${miss.map((k) => `<li><span>${esc(k.label)}</span>${btn('Received', 'ps.kyc', { cls: 'sm', data: { client: cl.id, key: k.key }, title: 'Mark as received: ' + k.label })}</li>`).join('')}</ul>`,
+        `<ul class="ps-kyc">${miss.map((k) => `<li><span>${esc(k.label)}</span>${btn('Mark received', 'ps.kyc', { cls: 'sm', data: { client: cl.id, key: k.key }, title: 'Mark as received: ' + k.label })}</li>`).join('')}</ul>`,
         c && remindKind(c) === 'onboarding' ? btn('Send reminder', 'ps.remind', { cls: 'sm', data: { case: c.id, kind: 'onboarding' } }) : '']);
     });
     return VK.section('ps-kyc', 'KYC requests', VK.table(['Client', 'Still missing', { label: '', cls: 'vk-act' }], rows,
@@ -8682,22 +9054,25 @@ const ADM = (() => {
   function steps(c, verified) {
     const q = c.questionnaire; const cur = ENGINE.currentGate(c); const out = [];
     out.push(['Confirm it’s you', verified ? 'done' : 'yours']);
-    out.push(['Questionnaire', released(c, 'G03') ? 'done' : (q.status === 'submitted' ? 'firm' : 'yours')]);
+    out.push(['Questionnaire', released(c, 'G03') ? 'done' : (q.status !== 'submitted' || resendReady(c) ? 'yours' : 'firm')]);
     out.push(['Documents', released(c, 'G04') ? 'done' : (q.status !== 'submitted' ? 'later' : (owedItems(c).length ? 'yours' : 'firm'))]);
     out.push(['Approve your return', released(c, 'G06') && ENGINE.currentApproval(c) ? 'done' : (cur === 'G06' ? 'yours' : (released(c, 'G04') ? 'firm' : 'later'))]);
     out.push(['Assessment decision', released(c, 'G14') ? 'done' : (cur === 'G14' ? 'yours' : (c.submission && c.submission.ok ? 'firm' : 'later'))]);
     if (c.remedy && c.remedy.route && c.remedy.route !== 'advice') out.push(['Authorise the remedy', c.remedy.authority && c.remedy.authority.route === c.remedy.route ? 'done' : 'yours']);
     return out;
   }
+  // The first step that is not done, when it is waiting on the firm rather than the client.
+  const firmStep = (st) => { const s = st.find((x) => x[1] !== 'done'); return s && s[1] === 'firm' ? s : null; };
   function stepsBlock(c) {
     const st = steps(c, true);
     const now0 = st.find((s) => s[1] === 'yours');
+    const firm0 = firmStep(st);
     return VK.section('ps-portal-steps', 'Your 2026 tax return', `<ol class="ps-steps">${st.map(([label, k], i) => `<li class="ps-step ps-st-${k}"><span class="ps-step-n" aria-hidden="true">${k === 'done' ? I.check : i + 1}</span><span class="ps-step-l">${esc(label)}</span>${VK.pill(STEP_WORD[k][0], STEP_WORD[k][1])}</li>`).join('')}</ol>`, {
-      intro: esc(now0 ? 'Next for you: ' + now0[0].toLowerCase() + '.' : 'Nothing is waiting for you right now.'),
+      intro: esc(now0 ? 'Next for you: ' + now0[0].toLowerCase() + '.' : firm0 ? FIRM_CHECKING : 'Nothing is waiting for you right now.'),
     });
   }
   function questionnaireCard(c) {
-    const q = c.questionnaire; const done = q.status === 'submitted';
+    const q = c.questionnaire; const again = resendable(c); const done = q.status === 'submitted' && !again;
     const row = (qq) => {
       const v = q.answers[qq.key]; const req = q.required.includes(qq.key); const id = 'ps-q-' + qq.key;
       const opts = done ? `<span class="ps-ans">${v === true ? 'Yes' : v === false ? 'No' : '<span class="muted">Not answered</span>'}</span>`
@@ -8707,10 +9082,15 @@ const ADM = (() => {
     };
     const n = q.required.filter((k) => k in q.answers).length;
     const foot = done ? `<p class="small muted">Submitted ${esc(q.at ? fWhen(q.at) : '')}. Your accountant uses it to personalise your checklist.</p>`
-      : `<div class="actions">${btn('Submit questionnaire', 'ps.submitQ', { cls: 'primary', data: { case: c.id } })}<span class="small muted">${esc(n + ' of ' + q.required.length + ' required questions answered')}</span></div>`;
+      : again ? `<div class="actions">${btn('Send my answers again', 'ps.submitQ', { cls: 'primary', data: { case: c.id } })}<span class="small muted">${esc('First sent ' + (q.at ? fWhen(q.at) : '') + '.')}</span></div>`
+        : `<div class="actions">${btn('Submit questionnaire', 'ps.submitQ', { cls: 'primary', data: { case: c.id } })}<span class="small muted">${esc(n + ' of ' + q.required.length + ' required questions answered')}</span></div>`;
+    const intro = done ? 'Thank you: your answers are with your accountant.'
+      : again ? (resendReady(c) ? 'Your accountant has checked your answers. Look them over, change any that are wrong, then send them again.'
+        : FIRM_CHECKING + ' You can still correct your answers here; send them again once your accountant is done.')
+        : 'Answer for 1 March 2025 to 28 February 2026. A Yes adds the matching document to your checklist.';
     return VK.section('ps-portal-questionnaire', 'Questionnaire', `<ul class="ps-qs">${ENGINE.QUESTIONS.map(row).join('')}</ul>${foot}`, {
-      count: done ? null : q.required.length - n,
-      intro: esc(done ? 'Thank you: your answers are with your accountant.' : 'Answer for 1 March 2025 to 28 February 2026. A Yes adds the matching document to your checklist.'),
+      count: done || again ? null : q.required.length - n,
+      intro: esc(intro),
     });
   }
   function itemRow(c, it) {
@@ -8737,6 +9117,98 @@ const ADM = (() => {
       intro: esc('Upload each document on its row, drop a file onto the row, or say why you do not have it. Simulated: only the file’s name and size are kept; nothing is opened or sent, and the AI check looks at the name and size alone.'),
     });
   }
+  /* ---------- the client review package (workflow step 13), built from the exact version the client is asked to approve ---------- */
+  const PACK_ITEMS = ((typeof STEP !== 'undefined' && STEP[13] && STEP[13].items) || ['Tax calculation.', 'Supporting calculation schedules.', 'Proposed ITR12 information.', 'Explanatory report.', 'Material matters requiring attention.'])
+    .map((s) => String(s).replace(/\.$/, ''));
+  // Plain labels for the calculator's lines (calc.js keeps the section references for the firm's view).
+  const LINE_WORD = {
+    employment: 'Income from your employer', interest: 'Interest you earned', interestExempt: 'Less: interest that is tax-free',
+    rental: 'Rental income after expenses', otherIncome: 'Other income (your accountant’s decision)', income: 'Total income',
+    deductions: 'Less: deductions (your accountant’s decision)', capitalGains: 'Total gain or loss on things you sold',
+    taxableCapitalGain: 'Part of that gain that is taxed', s11f: 'Less: retirement savings you can deduct', s18a: 'Less: donations you can deduct',
+    taxableIncome: 'Taxable income', normalTax: 'Tax on your taxable income', rebates: 'Less: rebates (set by your age)',
+    s6a: 'Less: medical scheme credit', s6b: 'Less: extra medical expenses credit', otherCredits: 'Less: other credits (your accountant’s decision)',
+    liability: 'Tax for the year', paye: 'Less: tax your employer already paid (PAYE)', provisional: 'Less: provisional tax you paid',
+  };
+  const KEEP_LINE = ['taxableIncome', 'normalTax', 'liability', 'result'];
+  const money = (n) => esc(CALC.rand(+n || 0));
+  const packPart = (i, body) => `<details class="ps-pack-i" data-pack="${i + 1}"${i === 0 ? ' open' : ''}><summary>${esc((i + 1) + '. ' + PACK_ITEMS[i])}</summary><div class="ps-pack-b">${body}</div></details>`;
+  const andList = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
+  const sentence = (t) => { const s = String(t || '').trim(); return /[.!?]$/.test(s) ? s : s + '.'; };
+  const resultWords = (n) => (n < 0 ? ['Refund due to you', -n] : n > 0 ? ['Amount you will owe SARS', n] : ['Nothing more due either way', 0]);
+  function packCalc(k) {
+    const lines = (k && Array.isArray(k.lines) ? k.lines : []).filter((l) => l.amount || KEEP_LINE.includes(l.key));
+    if (!lines.length) return VK.empty('Your accountant has not attached the calculation lines to this version.');
+    return VK.facts(lines.map((l) => {
+      if (l.key === 'result') { const [w, n] = resultWords(l.amount); return [w, `<strong>${VK.money(n)}</strong>`]; }
+      return [LINE_WORD[l.key] || l.label, VK.money(l.amount)];
+    }));
+  }
+  function packSchedules(s) {
+    if (!s || s.stub) return VK.empty('No supporting schedules are attached to this version.');
+    const out = [];
+    const e = s.employment || {}; if (e.remuneration || e.paye) out.push('Employment: ' + money(e.remuneration) + ' income; your employer already paid ' + money(e.paye) + ' tax for you.');
+    const i = s.interest || {}; if (i.gross) out.push('Interest: ' + money(i.gross) + ' earned; ' + money(i.exempt) + ' of it is tax-free (the limit is ' + money(i.limit) + '), so ' + money(i.taxable) + ' is taxed.');
+    const d = s.dividends || {}; if (d.exempt) out.push('Local dividends: ' + money(d.exempt) + ', which is not taxed as income.');
+    const r = s.rental || {}; if (r.income || r.expenses) out.push('Rental: ' + money(r.income) + ' income less ' + money(r.expenses) + ' expenses gives ' + money(r.net) + '.');
+    const g = s.cgt || {}; if (g.aggregate || g.broughtForward) out.push('Things you sold: a total gain or loss of ' + money(g.aggregate) + '. The first ' + money(g.exclusion) + ' of gains each year is tax-free; ' + money(g.taxable) + ' is added to your income.' + (g.lossCarried ? ' A loss of ' + money(g.lossCarried) + ' carries to next year.' : ''));
+    const rt = s.retirement || {}; if (rt.contributions) out.push('Retirement savings: you paid in ' + money(rt.contributions) + '; ' + money(rt.deduction) + ' is deducted this year' + (rt.carriedForward ? ' and ' + money(rt.carriedForward) + ' carries to next year' : '') + '.');
+    const dn = s.donations || {}; if (dn.donated) out.push('Donations: you gave ' + money(dn.donated) + '; ' + money(dn.deduction) + ' is deducted this year' + (dn.carriedForward ? ' and ' + money(dn.carriedForward) + ' carries to next year' : '') + '.');
+    const m = s.medical || {}; if (m.months || m.fees || m.expenses) out.push('Medical: ' + esc(m.months || 0) + ' month' + (m.months === 1 ? '' : 's') + ' on a medical scheme, ' + money(m.fees) + ' in scheme fees and ' + money(m.expenses) + ' in other medical costs. Credits: ' + money(m.s6aUsed) + ' for the scheme and ' + money(m.s6bUsed) + ' for extra costs.');
+    if (s.assessedLoss) out.push('A loss of ' + money(s.assessedLoss) + ' carries to next year.');
+    return out.length ? `<ul class="ps-mini">${out.map((h) => `<li>${h}</li>`).join('')}</ul>` : VK.empty('Nothing to schedule for this version.');
+  }
+  function packItr12(t) {
+    const decl = t && t.declared ? Object.values(t.declared) : [];
+    const rows = decl.map((d) => [esc(d.category || ''), esc(d.label || ''), VK.money(d.amount)]);
+    const m = t && t.medical;
+    const med = m && m.months ? `<p class="small">${esc('Medical scheme membership: ' + m.months + ' month' + (m.months === 1 ? '' : 's') + (m.periods && m.periods.length ? ' (' + m.periods.map((p) => p.months + ' month' + (p.months === 1 ? '' : 's') + ' with ' + p.dependants + ' dependant' + (p.dependants === 1 ? '' : 's')).join('; ') + ')' : '') + (m.share != null && m.share < 1 ? ', you paid ' + Math.round(m.share * 100) + '% of the fees' : '') + (m.disability ? ', with a disability' : '') + '.')}</p>` : '';
+    if (!rows.length && !med) return VK.empty('No ITR12 information is attached to this version.');
+    return `${VK.table(['Section', 'What is declared', 'Amount'], rows, { caption: 'Proposed ITR12 information', empty: 'Nothing is declared.' })}${med}`;
+  }
+  function packReport(c, k) {
+    const s = (k && k.summary) || {};
+    if (typeof s.taxableIncome !== 'number' || typeof s.result !== 'number') return VK.empty('Your accountant will add the explanation with the calculation.');
+    const paid = (s.paye || 0) + (s.provisional || 0); const tax = s.result + paid;
+    const less = [[s.rebates, 'rebates'], [s.medicalCredits, 'medical credits'], [s.otherCredits, 'other credits']].filter(([n]) => n > 0).map(([n, w]) => money(n) + ' of ' + w);
+    const [rw, rn] = resultWords(s.result);
+    const p = [
+      'For the ' + esc(c.year) + ' tax year your taxable income is ' + money(s.taxableIncome) + '. The tax on that is ' + money(s.normalTax) + '.',
+      less.length ? 'After ' + andList(less) + ', the tax for the year is ' + money(tax) + '.' : 'The tax for the year is ' + money(tax) + '.',
+      paid ? 'You have already paid ' + money(paid) + ' through ' + [s.paye ? 'your employer (PAYE)' : '', s.provisional ? 'provisional tax' : ''].filter(Boolean).join(' and ') + '.' : 'No tax has been paid in advance.',
+      rn ? esc(rw) + ': ' + money(rn) + '.' : 'Nothing more is due either way.',
+      'This is your accountant’s calculation. SARS makes the final assessment, and your accountant checks it against this version.',
+    ];
+    return p.map((x) => `<p>${x}</p>`).join('');
+  }
+  function packMatters(c, d) {
+    const out = [];
+    const judg = (d.schedules && Array.isArray(d.schedules.judgement)) ? d.schedules.judgement : [];
+    judg.forEach((j) => {
+      const f = (CALC.FIELDS && CALC.FIELDS[j.field]) || { label: j.field };
+      out.push(esc(f.label) + ': ' + money(j.amount) + '. ' + (j.decided && j.decided.rationale ? esc(sentence('Your accountant’s decision: ' + VK.scrub(j.decided.rationale))) : esc('Not decided yet; it is left out of the calculation until your accountant decides.')));
+    });
+    const vr = d.calc && d.calc.variance;
+    if (vr) {
+      const ex = S.exceptions.find((x) => x.caseId === c.id && x.code === 'TAX-05' && x.calcRef === 'TI ' + vr.current);
+      const why = !vr.material ? 'A small change, so no explanation is needed.'
+        : ex && ex.resolution ? sentence('Your accountant’s explanation: ' + VK.scrub(ex.resolution))
+          : 'Your accountant is still looking into this change.';
+      const move = vr.diff > 0 ? 'up ' + money(vr.diff) : vr.diff < 0 ? 'down ' + money(-vr.diff) : 'no change';
+      out.push('Change from last year: taxable income ' + money(vr.current) + ' against ' + money(vr.prior) + ' last year (' + move + '). ' + esc(why));
+    } else out.push(esc('Change from last year: there is no figure from last year to compare.'));
+    // Anything still open on the case, in plain words. The approval's own items (asked for here) are left out.
+    const open = ENGINE.exOf(c).filter((x) => ENGINE.isOpen(x) && !PORTAL_ONLY.includes(x.code));
+    if (open.length) open.forEach((x) => out.push(esc('Still open: ' + x.title + (x.clientAction ? '. What you can do: ' + x.clientAction : ''))));
+    else out.push(esc('Nothing else is still open.'));
+    return `<ul class="ps-mini">${out.map((h) => `<li>${h}</li>`).join('')}</ul>`;
+  }
+  function packBlock(c, v) {
+    const d = (v && v.data) || { calc: c.calc, schedules: c.schedules, itr12: c.itr12 };
+    return `<div class="ps-pack" aria-label="${esc('Your review package for version ' + v.n)}">
+      <p class="small muted">${esc('Your review package for version ' + v.n + '. Read each part before you confirm the declaration. Simulated figures for the demo.')}</p>
+      ${[packCalc(d.calc), packSchedules(d.schedules), packItr12(d.itr12), packReport(c, d.calc), packMatters(c, d)].map((b, i) => packPart(i, b)).join('')}</div>`;
+  }
   function approvalCard(c) {
     const v = ENGINE.curVersion(c); const ap = c.approval; const sub = c.submission && c.submission.ok;
     if (!v) return VK.section('ps-portal-approval', 'Approve your return', VK.empty('Nothing to approve yet. Your accountant is preparing the calculation.'));
@@ -8762,12 +9234,19 @@ const ADM = (() => {
         <label class="ps-check" for="ps-decl"><input type="checkbox" id="ps-decl" name="decl"> I confirm the declaration for version ${esc(v.n)}</label>
         <div class="actions">${current ? '' : `<button type="submit" class="btn primary">Approve version ${esc(v.n)}</button>`}
         ${btn('Something is wrong', 'ps.reject', { data: { case: c.id } })}${current ? btn('Withdraw my approval', 'ps.withdraw', { cls: 'danger', data: { case: c.id } }) : btn('I do not give authority', 'ps.withhold', { cls: 'ghost', data: { case: c.id } })}</div></form>`;
-    return VK.section('ps-portal-approval', 'Approve your return', `<div>${state}</div>${facts}${form}`, {
+    return VK.section('ps-portal-approval', 'Approve your return', `<div>${state}</div>${facts}${packBlock(c, v)}${form}`, {
       intro: esc('Your approval is for this exact version. If anything changes later, you are asked again.'),
     });
   }
   function assessmentCard(c) {
     if (!c.ita34) return '';
+    // The client sees SARS's figures and is asked to decide only once the consultant has reconciled the ITA34 (G12) and approved
+    // the explanation for release (G13). Until then the card says plainly that the accountant is checking it.
+    if (!ENGINE.stepDone(c, 'G13')) {
+      return VK.section('ps-portal-assessment', 'Your assessment from SARS', VK.empty('SARS has issued your assessment. Your accountant is checking it against your approved return and will send you an explanation before you decide anything.'), {
+        intro: esc('Simulated: no real SARS assessment is shown.'),
+      });
+    }
     // The engine keeps SARS's figures as ita34.values and its comparison with the firm's calculation as ita34.recon.
     const s = c.ita34.values || {};
     const diffs = (c.ita34.recon && c.ita34.recon.diffs) || [];
@@ -8777,7 +9256,7 @@ const ADM = (() => {
       ['Compared with your return', diffs.length ? `<ul class="ps-mini">${diffs.map((d) => `<li>${esc(d.label)}: your return ${VK.money(d.firm)}, SARS ${VK.money(d.sars)}</li>`).join('')}</ul>` : esc('No difference above the firm’s threshold')]])}
       ${dec ? `<p>${VK.pill(dec.choice === 'accept' ? 'You accepted the assessment' : 'You asked your accountant to act', dec.choice === 'accept' ? 'ok' : 'info')} <span class="small muted">${esc(fWhen(dec.at))}${dec.note ? ' · ' + esc(VK.scrub(dec.note)) : ''}</span></p>`
         : `<div class="actions">${btn('Accept the assessment', 'ps.decide', { cls: 'primary', data: { case: c.id, choice: 'accept' } })}${btn('I don’t agree: ask my accountant to act', 'ps.decide', { data: { case: c.id, choice: 'instruct' } })}</div>`}`;
-    return VK.section('ps-portal-assessment', 'Your assessment from SARS', body, { intro: esc('SARS’s assessment (simulated). Your accountant checks it against your approved return before you decide.') });
+    return VK.section('ps-portal-assessment', 'Your assessment from SARS', body, { intro: esc('SARS’s assessment (simulated). Your accountant has checked it against your approved return; you can now accept it or ask them to act.') });
   }
   function remedyCard(c) {
     const r = c.remedy; if (!r || !r.route) return '';
@@ -8787,9 +9266,36 @@ const ADM = (() => {
       ${r.route === 'advice' ? '' : authed ? `<p>${VK.pill('You authorised it ' + fWhen(r.authority.at), 'ok')}</p>` : `<div class="actions">${btn('Authorise this', 'ps.authorise', { cls: 'primary', data: { case: c.id } })}</div>`}`;
     return VK.section('ps-portal-remedy', 'Disputing the assessment', body, { intro: esc('Your accountant needs your authority before anything is sent to SARS on your behalf.') });
   }
+  // "What you did": the client's own actions in plain words. The firm's audit trail keeps the full record (gate releases, refusals,
+  // exception codes); the client sees none of that. Returns the words for one audit entry, or null to leave it out.
+  function clientWords(c, a, prev) {
+    const t = String(a.text || ''); const vn = (/version (\d+)/.exec(t) || [])[1];
+    switch (a.result) {
+      case 'Verified': return 'Opened your portal with the one-time code (simulated)';
+      case 'Saved': case 'Uploaded': case 'Requested': case 'Authorised': return t;
+      case 'Submitted': return /questionnaire/i.test(t) ? 'Sent your questionnaire to your accountant' : 'Told your accountant your documents are uploaded';
+      case 'Approved': return /^Re-confirmed/.test(t) ? 'Confirmed your approval of version ' + vn + ' again' : 'Approved version ' + vn + ' of your return and gave your accountant authority to submit it';
+      case 'Withdrawn': return t.replace(/^Withdrew the approval/, 'Withdrew your approval');
+      case 'Resolved': return 'Answered your accountant’s question';
+      case 'Raised':
+        if (a.code === 'CLT-02') return 'Told your accountant something is wrong with your return';
+        if (a.code === 'CLT-04') return 'Said you do not give authority to submit your return';
+        return null;
+      case 'Released':
+        if (a.gate === 'G14') return c.decision && c.decision.choice === 'instruct' ? 'Asked your accountant to act on SARS’s assessment' : 'Accepted SARS’s assessment';
+        // The first send of the questionnaire has its own line; a later send (after the firm's checks) shows only as G03 passing.
+        if (a.gate === 'G03') return prev && prev.result === 'Submitted' && /questionnaire/i.test(prev.text || '') ? null : 'Sent your answers again';
+        return null;
+      default: return null;
+    }
+  }
   function messagesCard(c) {
     const rem = c.reminders.slice().reverse().map((r) => `<div class="vk-row vk-row-log"><span class="vk-when">${VK.when(r.sent)}</span><div class="vk-row-b"><div class="vk-row-t">${esc('Reminder from ' + FIRM + ' (' + r.kind + ')')}</div><div class="vk-meta">${esc('Runs out ' + fWhen(r.expires))}</div></div></div>`);
-    const mine = S.audit.filter((a) => a.caseId === c.id && a.role === 'Client').slice(-6).reverse().map((a) => `<div class="vk-row vk-row-log"><span class="vk-when">${VK.when(a.at)}</span><div class="vk-row-b"><div class="vk-row-t">${esc(VK.scrub(a.text))}${a.result === 'Refused' ? ' ' + VK.pill('Refused', 'bad') : ''}</div></div></div>`);
+    const all = S.audit.filter((a) => a.caseId === c.id && a.role === 'Client');
+    const words = all.map((a, i) => ({ a, w: clientWords(c, a, all[i - 1]) })).filter((x) => x.w);
+    const mine = words.slice(-6).reverse().map(({ a, w }) => `<div class="vk-row vk-row-log"><span class="vk-when">${VK.when(a.at)}</span><div class="vk-row-b"><div class="vk-row-t">${esc(VK.scrub(w))}</div></div></div>`);
+    const firm0 = firmStep(steps(c, true));
+    if (firm0) mine.unshift(`<div class="vk-row vk-row-log ps-now"><span class="vk-when">Now</span><div class="vk-row-b"><div class="vk-row-t">${esc(FIRM_CHECKING)}</div><div class="vk-meta">${esc('Step: ' + firm0[0])}</div></div></div>`);
     return VK.section('ps-portal-messages', 'Messages and activity', `<h3 class="ps-h3">From your accountant</h3>${VK.list(rem, { empty: 'No reminders.' })}<h3 class="ps-h3">What you did</h3>${VK.list(mine, { empty: 'Nothing yet.' })}`, {
       intro: esc('Reminders are simulated messages. Everything you do here is recorded in the firm’s audit trail.'),
     });
@@ -8897,7 +9403,16 @@ const ADM = (() => {
     'ps.sample': (t) => { const c = caseFrom(t); if (!c) return; const it = c.items.find((x) => x.id === t.dataset.item); if (!it) return; upload(c.id, it.id, { name: ENGINE.FILE_FOR[it.kind] || it.kind + '_2026.pdf', size: SAMPLE_SIZE }); },
     'ps.na': (t) => { const c = caseFrom(t); if (!c) return; const it = c.items.find((x) => x.id === t.dataset.item); if (!it) return;
       reasonModal(c, 'Not available: ' + it.label, 'Why don’t you have it?', 'na', 'Sent your reason to your accountant.', { call: (reason) => ENGINE.portal(c, 'na', { itemId: it.id, reason }), hint: 'Your accountant confirms the reason. Until then the document still counts as needed.' }); },
-    'ps.submitQ': (t) => { const c = caseFrom(t); if (c) VK.done(ENGINE.portal(c, 'submitQuestionnaire'), 'Questionnaire submitted. Your checklist is updated.'); },
+    'ps.submitQ': (t) => {
+      const c = caseFrom(t); if (!c) return;
+      const again = resendable(c);
+      const r = ENGINE.portal(c, 'submitQuestionnaire');
+      // A refusal that is about the firm's own checks (an open exception or an earlier step) is told to the client plainly, without codes.
+      if (!r.ok && ((r.codes && r.codes.length) || (r.before && r.before.length))) {
+        toast((again ? 'Your answers are saved. ' : 'Questionnaire submitted. ') + FIRM_CHECKING); render(); return;
+      }
+      VK.done(r, again ? 'Your answers are sent again. Your accountant has them.' : 'Questionnaire submitted. Your checklist is updated.');
+    },
     'ps.submitDocs': (t) => {
       const c = caseFrom(t); if (!c) return;
       const r = ENGINE.portal(c, 'submitDocs');

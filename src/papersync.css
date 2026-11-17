@@ -50,6 +50,15 @@
 .ps-check{display:flex;align-items:flex-start;gap:8px;font-weight:600;font-size:14px;cursor:pointer}
 .ps-check input{margin-top:3px;flex:none}
 .ps-verify{display:flex;flex-direction:column;gap:10px;max-width:440px}
+/* The client review package (step 13): one disclosure per part, so the declaration below stays in reach. */
+.ps-pack{display:flex;flex-direction:column;gap:6px;margin:10px 0 12px;min-width:0}
+.ps-pack-i{border:1px solid var(--op-rule);border-radius:8px;background:var(--op-surface);min-width:0}
+.ps-pack-i>summary{cursor:pointer;padding:9px 12px;font-weight:600;font-size:14px}
+.ps-pack-i[open]>summary{border-bottom:1px solid var(--op-rule)}
+.ps-pack-b{padding:10px 12px;font-size:14px;line-height:1.5;overflow-wrap:anywhere;min-width:0}
+.ps-pack-b p{margin:0 0 6px}
+.ps-pack-b p:last-child{margin-bottom:0}
+.ps-now .vk-when{font-weight:600}
 
 /* Try it */
 .ps-try p{font-size:14px}

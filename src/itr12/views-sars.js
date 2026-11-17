@@ -1,7 +1,8 @@
 /* SARS link (simulated): the link's status, the transaction log (S.txs) with each open transaction's eight G18 checks and blockers,
    the two-person sign-off, sending with a chosen simulated outcome, the no-blind-retry rule (check the status before any retry,
    INT-04), the manual fallback (INT-13) and its independent reconciliation, and the inbound items (S.inbound) with routing and
-   date confirmation. Nothing here connects to SARS. Every button calls ENGINE with ACTOR.me(); a refusal shows ENGINE's reason.
+   date confirmation, and "Simulate SARS sending an ITA34" for a submitted return (ENGINE.receive: SARS acts, not the signed-in
+   person). Nothing here connects to SARS. Every other button calls ENGINE with ACTOR.me(); a refusal shows ENGINE's reason.
    Locked buttons say which role acts; ENGINE checks the role again whatever the screen shows. */
 (() => {
   const finish = (r, msg) => (r && r.ok ? () => VK.done(r, msg) : 'Not done: ' + ((r && r.why) || 'Operon refused this.'));
@@ -75,7 +76,7 @@
     const result = (t) => {
       const parts = [];
       if (t.ref) parts.push(`<div class="small">Reference <span class="mono">${esc(t.ref)}</span></div>`);
-      if (t.manual) parts.push(`<div class="small">Manual reference <span class="mono">${esc(t.manual.ref)}</span> · ${esc(VK.who(t.manual.by))}</div>`);
+      if (t.manual) parts.push(`<div class="small">Manual reference <span class="mono">${esc(VK.scrub(t.manual.ref))}</span> · ${esc(VK.who(t.manual.by))}</div>`);
       if (t.attempts.length) parts.push(`<div class="small muted">${esc(plural(t.attempts.length, 'send'))}, last ${VK.when(t.attempts[t.attempts.length - 1].at)}</div>`);
       if (t.parentTx) parts.push(`<div class="small muted">Retry of ${esc(t.parentTx)}</div>`);
       return parts.join('');
@@ -136,11 +137,17 @@
       items.map((it) => [`${esc(it.label)} <span class="mono small">${esc(it.ref || it.id)}</span><div class="small muted">${esc(it.id)} · received ${VK.when(it.at)} · hash <span class="mono">${esc(String(it.hash || '').slice(0, 12))}…</span></div>`,
         who(it), where(it), dates(it), iacts(it)]),
       { caption: 'Inbound items from SARS (simulated)', empty: 'Nothing has arrived from SARS.' });
+    const waiting = awaitingIta34();
     return VK.section('ops-sars-inbound', 'Inbound from SARS', table, {
       count: items.filter((it) => it.status === 'unrouted').length || null,
-      intro: esc('Notices, assessments and requests, newest first. Each is hashed and matched to a case by tax reference and year; one that matches no case raises INT-14 and waits for the Integration Administrator. An unreadable date is never guessed (INT-15).'),
+      intro: esc('Notices, assessments and requests, newest first. Each is hashed and matched to a case by tax reference and year; one that matches no case raises INT-14 and waits for the Integration Administrator. An unreadable date is never guessed (INT-15). '
+        + (waiting.length ? plural(waiting.length, 'submitted return') + ' ' + (waiting.length === 1 ? 'waits' : 'wait') + ' for SARS’s assessment: “Simulate SARS sending an ITA34” plays SARS’s part.' : 'No submitted return is waiting for SARS’s assessment.')),
+      actions: waiting.length ? btn('Simulate SARS sending an ITA34', 'ops.in.ita34', { cls: 'sm', id: 'ops-sim-ita34' }) : '',
     });
   }
+
+  // Submitted returns with no assessment yet: the ones the simulated SARS can send an ITA34 for.
+  const awaitingIta34 = () => S.cases.filter((c) => !c.archived && c.submission && c.submission.ok && !c.ita34 && !c.pendingIta34 && c.calc && c.calc.summary);
 
   /* ---------- the rules on this link ---------- */
   function rulesBlock() {
@@ -226,7 +233,40 @@
       <label class="f" for="ops-in-due">Due date (if any)<input id="ops-in-due" name="due" type="date" value="${esc(it.due || '')}"></label>`,
     'Confirm dates', (fd) => finish(ENGINE.confirmInboundDate(it, ACTOR.me(), { date: String(fd.date || ''), due: String(fd.due || '') }), 'Confirmed the dates on ' + it.id + '.'));
   }
-  Object.assign(ACT, { 'ops.link': actLink, 'ops.tx.send': actSend, 'ops.tx.check': actCheck, 'ops.tx.retry': actRetry, 'ops.tx.manual': actManual, 'ops.in.route': actRoute, 'ops.in.date': actDate });
+  // The simulated SARS issues the assessment (ITA34) for a submitted return: the firm's approved figures, or with one figure
+  // changed to show a difference (ASM-02). ENGINE.receive records SARS as the actor and routes it to the case by tax reference and year.
+  function actIta34(t) {
+    const cases = awaitingIta34();
+    if (!cases.length) { toast('No submitted return is waiting for an assessment.'); render(); return; }
+    const pre = cases.find((c) => c.id === (t.dataset.case || '')) || cases[0];
+    const today = ENGINE.isoDay(now());
+    modal('Simulate SARS sending an ITA34', `<p class="note">${esc('This plays SARS’s part: nothing is received from SARS. Operon records it as SARS (simulated) and compares it figure by figure with the approved calculation (G12).')}</p>
+      <label class="f" for="ops-ita-case">Submitted return<select id="ops-ita-case" name="case">${cases.map((c) => `<option value="${esc(c.id)}"${c === pre ? ' selected' : ''}>${esc(c.id + ' · ' + VK.clientName(c.clientId) + ' · ' + c.year + ' · reference ' + c.submission.ref)}</option>`).join('')}</select></label>
+      <label class="f" for="ops-ita-date">Date of assessment<input id="ops-ita-date" name="date" type="date" value="${esc(today)}"></label>
+      <fieldset class="ops-radios"><legend class="small muted">What SARS assesses (simulated)</legend>
+        <label><input type="radio" name="how" value="same" checked> <span><strong>The firm’s approved figures</strong><br><span class="small muted">The assessment agrees with the approved calculation.</span></span></label>
+        <label><input type="radio" name="how" value="diff"> <span><strong>One figure differs</strong><br><span class="small muted">${esc('SARS uses a different amount for the figure below; a difference over ' + CALC.rand(S.policy.materiality.amount) + ' raises ASM-02.')}</span></span></label></fieldset>
+      <div class="ops-ita-diff"><label class="f" for="ops-ita-field">Figure that differs<select id="ops-ita-field" name="field">${ITA34_FIELDS.map((f) => `<option value="${esc(f.key)}">${esc(f.label)}</option>`).join('')}</select></label>
+      <label class="f" for="ops-ita-amount">SARS’s amount (rand)<input id="ops-ita-amount" name="amount" inputmode="decimal" autocomplete="off"></label></div>`,
+    'Send the ITA34 (simulated)', (fd) => {
+      const c = cases.find((x) => x.id === String(fd.case || ''));
+      if (!c || !awaitingIta34().includes(c)) return 'Pick a submitted return that has no assessment yet.';
+      const date = String(fd.date || '');
+      if (!DATES.dt(date)) return 'Give the date of assessment.';
+      const data = Object.assign({}, c.calc.summary);
+      if (fd.how === 'diff') {
+        const key = String(fd.field || ''); const raw = String(fd.amount || '').replace(/[\sR,]/g, '');
+        if (!ITA34_FIELDS.some((f) => f.key === key)) return 'Choose the figure that differs.';
+        if (!/^-?\d+(\.\d{1,2})?$/.test(raw)) return 'Give SARS’s amount as a number, for example 498000.';
+        data[key] = Number(raw);
+      }
+      const n = S.inbound.filter((it) => it.fn === 'ita34').length + 1;
+      const it = ENGINE.receive({ fn: 'ita34', taxRef: ENGINE.clientOf(c).taxRef, year: c.year, ref: 'ITA34-SIM-' + c.id + '-' + n, date, data, submissionRef: c.submission.ref });
+      const ok = !!(it && it.caseId === c.id && c.ita34 && c.ita34.ref === it.ref);
+      return finish({ ok, why: ok ? '' : 'The simulated ITA34 did not reach ' + c.id }, 'SARS (simulated) sent ITA34 ' + it.ref + ' for ' + c.id + (ok && !c.ita34.recon.ok ? ': it differs from the approved calculation (ASM-02).' : ': it agrees with the approved calculation.'));
+    });
+  }
+  Object.assign(ACT, { 'ops.in.ita34': actIta34, 'ops.link': actLink, 'ops.tx.send': actSend, 'ops.tx.check': actCheck, 'ops.tx.retry': actRetry, 'ops.tx.manual': actManual, 'ops.in.route': actRoute, 'ops.in.date': actDate });
 
   // Header count: transactions whose outcome is in doubt, and inbound items no case has claimed.
   NAV_COUNT.sars = () => S.txs.filter((t) => ['unknown', 'no-response', 'manual'].includes(t.status)).length + S.inbound.filter((it) => it.status === 'unrouted').length;

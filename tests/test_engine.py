@@ -439,9 +439,11 @@ def test_rule02_ai_may_raise_severity_but_not_lower(page):
       const x = ENGINE.raise(c, 'MD-01', { by: tc });   // S3
       const o = { up: ENGINE.setSeverity(x, ai, 'S2', { reason: 'Looks material' }).ok, sev1: x.sev };
       o.down = ENGINE.setSeverity(x, ai, 'S3', { reason: 'Changed my mind' }).ok; o.sev2 = x.sev;
-      const y = ENGINE.raise(c, 'MD-02', { by: tc });   // S3, owner Administrator
-      o.humanDownNoReason = ENGINE.setSeverity(y, tc, 'S4', {}).ok;
-      o.humanDown = ENGINE.setSeverity(y, tc, 'S4', { reason: 'Cosmetic only' }).ok;
+      const y = ENGINE.raise(c, 'MD-02', { by: tc });   // S3, Blocking Yes, owner Administrator
+      o.humanDownNoReason = ENGINE.setSeverity(y, ad, 'S4', {}).ok;
+      o.notOwner = ENGINE.setSeverity(y, tc, 'S4', { reason: 'Cosmetic only' }).ok;
+      o.humanDown = ENGINE.setSeverity(y, ad, 'S4', { reason: 'Cosmetic only' });
+      o.approved = ENGINE.approveSeverity(y, rc).ok;
       o.y = [y.sev, y.blocking, ENGINE.blocksNow(y)];
       o.upAgain = ENGINE.setSeverity(y, ai, 'S3', { reason: 'x' }).ok; o.y2 = [y.sev, y.blocking];
       o.audited = S.audit.filter((a) => a.exceptionId === x.id && /severity|Lowering/i.test(a.text)).length;
@@ -449,7 +451,11 @@ def test_rule02_ai_may_raise_severity_but_not_lower(page):
     """)
     assert r["up"] and r["sev1"] == "S2"
     assert not r["down"] and r["sev2"] == "S2", "Rule 2: the AI may raise severity but never lower it"
-    assert not r["humanDownNoReason"] and r["humanDown"] and r["y"] == ["S4", "No", False]
+    # The register rules (review finding R3): Severity and Blocking are separate columns, so lowering MD-02 to S4 leaves it
+    # blocking; only its owner (the Administrator) may ask, and the Records/Compliance Owner approves.
+    assert not r["humanDownNoReason"] and not r["notOwner"], r
+    assert r["humanDown"]["ok"] and r["humanDown"].get("pending") and r["approved"], r
+    assert r["y"] == ["S4", "Yes", True], r["y"]
     assert r["upAgain"] and r["y2"] == ["S3", "Yes"]
     assert r["audited"] >= 2
 
@@ -461,8 +467,11 @@ def test_rule02_lowering_s1_s2_needs_records_compliance_approval(page):
       const o = { req: ENGINE.setSeverity(x, tc, 'S3', { reason: 'Bank letter on file' }), pendingSev: x.sev, stillBlocks: ENGINE.blocksNow(x) };
       o.byTc2 = ENGINE.approveSeverity(x, tc2).ok; o.byRequester = ENGINE.approveSeverity(x, tc).ok;
       o.byRc = ENGINE.approveSeverity(x, rc).ok; o.sev = x.sev;
-      const y = ENGINE.raise(c, 'VER-03', { by: tc });   // S1
-      ENGINE.setSeverity(y, rc, 'S2', { reason: 'Version confirmed' });
+      // The register rules (review finding R3): only the owner asks to lower a blocking code. RET-03 (S3) belongs to the
+      // Records/Compliance Owner, so the approver-is-not-the-requester rule is checked on it.
+      const y = ENGINE.raise(c, 'RET-03', { by: tc });   // S3, Blocking Yes, owner Records/Compliance Owner
+      o.yByTc = ENGINE.setSeverity(y, tc, 'S4', { reason: 'Review booked' }).ok;
+      ENGINE.setSeverity(y, rc, 'S4', { reason: 'Review booked' });
       o.selfApprove = ENGINE.approveSeverity(y, rc).ok; o.ySev = y.sev;
       const rc2 = H.addPerson('RC2', 'Records/Compliance Owner');
       o.otherRc = ENGINE.approveSeverity(y, rc2).ok; o.ySev2 = y.sev;
@@ -472,8 +481,9 @@ def test_rule02_lowering_s1_s2_needs_records_compliance_approval(page):
     assert r["req"]["ok"] and r["req"].get("pending") and r["pendingSev"] == "S2" and r["stillBlocks"]
     assert not r["byTc2"] and not r["byRequester"], "Only the Records/Compliance Owner approves lowering an S2"
     assert r["byRc"] and r["sev"] == "S3"
-    assert not r["selfApprove"] and r["ySev"] == "S1", "The approver must not be the requester"
-    assert r["otherRc"] and r["ySev2"] == "S2"
+    assert not r["yByTc"], "Only the owner of a blocking code may ask to lower it"
+    assert not r["selfApprove"] and r["ySev"] == "S3", "The approver must not be the requester"
+    assert r["otherRc"] and r["ySev2"] == "S4"
     assert "Requested" in r["audit"] and "Refused" in r["audit"] and "Changed" in r["audit"]
 
 

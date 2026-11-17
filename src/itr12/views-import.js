@@ -17,7 +17,10 @@
   /* ---------- Templates ---------- */
   const fmtOf = (f) => ({ date: 'Date, YYYY-MM-DD', id: '13 digits', taxref: '10 digits', email: 'Email address', phone: 'Phone number', yesno: 'Yes or No',
     postcode: '4 digits', branch: '6 digits', account: 'Digits', choice: 'One of: ' + (f.choices || []).join(', ') }[f.kind] || 'Text');
-  const reqOf = (f) => (f.req || f.key === 'id_number' || f.key === 'tax_ref' ? 'Required' : (f.key === 'provisional' ? 'Recommended (blank counts as No)' : 'Optional'));
+  const reqOf = (f) => (f.req || f.key === 'tax_ref' ? 'Required'
+    : f.key === 'id_number' ? 'Required, or the passport number with the date of birth'
+      : f.key === 'date_of_birth' ? 'Required when there is no RSA ID number'
+        : f.key === 'provisional' ? 'Recommended (blank counts as No)' : 'Optional');
   const csvCell = (v) => { const s = String(v == null ? '' : v); return /[",\r\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const csvTemplate = () => '﻿' + FIELDS.map((f) => csvCell(f.label)).join(',') + '\r\n';
 
@@ -141,8 +144,14 @@
         default: break;
       }
     });
-    if (!v.id_number && !v.passport_number) errors.push('RSA ID number is required.');
-    else if (!v.id_number) errors.push('The preview’s client record needs an RSA ID number; passport-only clients are not supported yet.');
+    // Phase 1: a client with no RSA ID gives the passport number, issue date and country, nationality and relevant foreign tax
+    // information. The date of birth is required then, because the age sets the rebates and the ID number cannot give it.
+    if (!v.id_number && !v.passport_number) errors.push('RSA ID number is required, or the passport number for a client without one.');
+    else if (!v.id_number) {
+      if (!v.date_of_birth) errors.push('Date of birth is required for a client with no RSA ID number.');
+      const gaps = ['passport_issue_date', 'passport_country', 'nationality', 'foreign_tax_info'].filter((k) => !v[k]).map((k) => BY[k].label.toLowerCase());
+      if (gaps.length) warnings.push('No RSA ID number: Phase 1 also asks for the ' + gaps.join(', ') + '.');
+    }
     if (!v.tax_ref) errors.push('Income tax reference number is required.');
     if (!v.provisional) warnings.push('Provisional taxpayer is blank: treated as No, which uses the earlier filing deadline.');
     if (v.id_number && v.date_of_birth && ADM.dobFromId(v.id_number) && ADM.dobFromId(v.id_number) !== v.date_of_birth) errors.push('Date of birth does not match the ID number.');
@@ -150,9 +159,10 @@
     if (!v.street && !v.city) warnings.push('No residential address yet: it is needed before G01 (KYC-01).');
     if (!v.bank && !v.account_number) warnings.push('No banking details yet: they are needed before G01 (KYC-01).');
     // Duplicates: against the client master, then within the file.
-    const dupe = S.clients.find((c) => (v.id_number && c.idNo === v.id_number) || (v.tax_ref && c.taxRef === v.tax_ref));
+    const dupe = S.clients.find((c) => (v.id_number && c.idNo === v.id_number) || (v.tax_ref && c.taxRef === v.tax_ref)
+      || (!v.id_number && v.passport_number && c.master && c.master.passport_number === v.passport_number));
     if (dupe) errors.push('Already in the client master as ' + dupe.id + '.');
-    ['id_number', 'tax_ref'].forEach((k) => { if (!v[k]) return; const was = seen[k + '|' + v[k]]; if (was) errors.push(BY[k].label + ' is the same as on line ' + was + '.'); else seen[k + '|' + v[k]] = line; });
+    ['id_number', 'tax_ref', 'passport_number'].forEach((k) => { if (!v[k]) return; const was = seen[k + '|' + v[k]]; if (was) errors.push(BY[k].label + ' is the same as on line ' + was + '.'); else seen[k + '|' + v[k]] = line; });
     return { line, v, errors, warnings, name: [v.first_name, v.surname].filter(Boolean).join(' ') };
   }
   function check(text, source) {
@@ -197,7 +207,8 @@
     const ready = R.rows.filter((r) => !r.errors.length); const bad = R.rows.length - ready.length;
     const msg = (r) => `${r.errors.map((t) => `<div class="adm-msg bad">${I.alert}<span>${esc(t)}</span></div>`).join('')}${r.warnings.map((t) => `<div class="adm-msg warn">${I.clock}<span>${esc(t)}</span></div>`).join('')}${!r.errors.length && !r.warnings.length ? '<span class="muted">No problems</span>' : ''}`;
     const rows = R.rows.map((r) => ({ cls: r.errors.length ? 'adm-diff' : '', cells: [esc(r.line), `<strong>${esc(r.name || '(no name)')}</strong>`,
-      r.v.id_number ? `${VK.idHtml(r.v.id_number)}<div class="small">${r.v.tax_ref ? VK.taxRefHtml(r.v.tax_ref) : '<span class="muted">No tax reference</span>'}</div>` : '<span class="muted">No ID number</span>',
+      (r.v.id_number ? VK.idHtml(r.v.id_number) : r.v.passport_number ? `<span class="small muted">Passport</span> <span class="mono vk-masked" title="Passport number, masked: only the last 4 characters show">${esc(VK.maskTaxRef(r.v.passport_number))}</span>` : '<span class="muted">No ID number</span>')
+        + `<div class="small">${r.v.tax_ref ? VK.taxRefHtml(r.v.tax_ref) : '<span class="muted">No tax reference</span>'}</div>`,
       r.errors.length ? VK.pill('Will be skipped', 'bad') : (r.warnings.length ? VK.pill('Ready, with warnings', 'warn') : VK.pill('Ready', 'ok')), msg(r)] }));
     const lock = isAdmin() ? null : LOCK_WHY;
     const create = ready.length ? btn('Create ' + plural(ready.length, 'client'), 'adm.impCreate', { cls: 'primary', lock }) : '';
@@ -236,7 +247,8 @@
         const ids = [];
         ready.forEach((r) => {
           const v = r.v; const master = {}; FIELDS.forEach((f) => { if (v[f.key]) master[f.key] = v[f.key]; });
-          const cl = ENGINE.newClient({ name: [v.first_name, v.surname].filter(Boolean).join(' '), idNo: v.id_number, taxRef: v.tax_ref, provisional: v.provisional === 'Yes',
+          // A passport-only client keeps no ID number (idNo null); the date of birth comes from the row.
+          const cl = ENGINE.newClient({ name: [v.first_name, v.surname].filter(Boolean).join(' '), idNo: v.id_number || null, dob: v.date_of_birth || null, taxRef: v.tax_ref, provisional: v.provisional === 'Yes',
             email: v.email || null, kyc: Object.fromEntries(ENGINE.KYC_ITEMS.map((k) => [k.key, false])), master }, ACTOR.me());  // the engine refuses anyone but an Administrator
           if (cl && cl.id && cl.ok !== false) ids.push(cl.id);
         });

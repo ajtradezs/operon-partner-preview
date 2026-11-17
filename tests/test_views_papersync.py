@@ -137,6 +137,9 @@ def test_kyc_received_and_na_approval_go_through_engine(page):
     case = page.evaluate("DEMO.keys.onboarding")
     cl = page.evaluate("ENGINE.caseById(DEMO.keys.onboarding).clientId")
     go(page, "Administrator", "#papersync")
+    # m1: the button is an action ("Mark received"), not a status that reads "Proof of address Received".
+    labels = page.locator("[data-rv-key='ps-kyc'] button[data-act='ps.kyc']").all_inner_texts()
+    assert labels and all(t.strip() == "Mark received" for t in labels), labels
     n0 = page.evaluate("S.audit.length")
     click(page, f"[data-rv-key='ps-kyc'] button[data-act='ps.kyc'][data-client='{cl}'][data-key='address']")
     r = page.evaluate("""([cl, n0]) => ({ ok: S.clients.find((x) => x.id === cl).kyc.find((k) => k.key === 'address').ok,
@@ -329,8 +332,23 @@ def test_approval_is_asked_for_only_at_g06_and_rows_lock_after_submission(page):
 
 
 def test_assessment_shows_sars_figures_and_the_differences(page):
+    # W3: the ITA34 is in (G12 still open), so the client is told the accountant is checking it: no figures, no decision buttons.
     case = page.evaluate("DEMO.keys.assessment")
+    assert page.evaluate("id => { const c = ENGINE.caseById(id); return [!!c.ita34, ENGINE.stepDone(c, 'G13')]; }", case) == [True, False]
     open_portal(page, case)
+    sec = page.locator("[data-rv-key='ps-portal-assessment']")
+    text = sec.inner_text()
+    assert "Your accountant is checking it" in text
+    assert sec.locator("button[data-act='ps.decide']").count() == 0
+    diffs = page.evaluate("id => ENGINE.caseById(id).ita34.recon.diffs.map((d) => d.label)", case)
+    assert diffs and not any(label in text for label in diffs)
+    # The Tax Consultant reconciles the ITA34 (ASM-02, G12) and approves the explanation (G13): now the client sees it and decides.
+    page.evaluate("""id => { const c = ENGINE.caseById(id); const tc = ACTOR.as('Tax Consultant');
+        ENGINE.openOf(c, 'ASM-02').forEach((x) => ENGINE.resolve(x, tc, { action: 'SARS used a lower retirement annuity figure than the certificate' }));
+        if (c.gates.G12.status !== 'released') ENGINE.release(c, 'G12', tc);
+        ENGINE.markReq(c, 'G13', 'advice', tc); ENGINE.release(c, 'G13', tc); render(); }""", case)
+    assert page.evaluate("id => ENGINE.stepDone(ENGINE.caseById(id), 'G13')", case) is True
+    assert sec.locator("button[data-act='ps.decide']").count() == 2
     exp = page.evaluate("""id => { const c = ENGINE.caseById(id); return { result: c.ita34.values.result, diffs: c.ita34.recon.diffs.map((d) => d.label) }; }""", case)
     assert isinstance(exp["result"], (int, float)) and exp["diffs"], exp
     text = page.locator("[data-rv-key='ps-portal-assessment']").inner_text()
@@ -424,6 +442,128 @@ def test_assessment_decision_and_remedy_authority(page):
     r = page.evaluate("""([id, n0]) => { const c = ENGINE.caseById(id); return { route: c.remedy.authority && c.remedy.authority.route,
         audit: S.audit.slice(n0).some((a) => a.caseId === id && a.role === 'Client' && a.result === 'Authorised') }; }""", [rem, n0])
     assert r == {"route": "objection", "audit": True}
+    assert page.errors == []
+
+
+CODE_RX = re.compile(r"\b(?:[A-Z]{2,4}-\d{2}|G\d{2})\b")
+FIRM_CHECKING = "Your accountant is checking something before this step completes."
+
+
+def steps_of(pg):
+    return pg.evaluate("""() => Object.fromEntries(Array.from(document.querySelectorAll('[data-rv-key="ps-portal-steps"] .ps-step'))
+        .map((li) => [li.querySelector('.ps-step-l').textContent, li.querySelector('.pill').textContent]))""")
+
+
+def test_questionnaire_can_be_sent_again_once_the_firm_has_checked_it(page):
+    # B1: the questionnaire case was submitted, then G03 was held for QUE-04 and QUE-03.
+    case = page.evaluate("DEMO.keys.questionnaire")
+    assert page.evaluate("id => { const c = ENGINE.caseById(id); return [c.questionnaire.status, c.gates.G03.status, ENGINE.openOf(c, 'QUE-04').length, ENGINE.openOf(c, 'QUE-03').length]; }", case) == ["submitted", "pending", 1, 1]
+    open_portal(page, case)
+    sec = page.locator("[data-rv-key='ps-portal-questionnaire']")
+    # The answers can be changed and sent again; while the firm is still checking, the step is the firm's and says so plainly.
+    assert sec.locator("input[type=radio]").count() > 0
+    assert sec.locator("button[data-act='ps.submitQ']").inner_text().strip() == "Send my answers again"
+    assert FIRM_CHECKING in sec.inner_text()
+    assert steps_of(page)["Questionnaire"] == "With your accountant"
+    click(page, "[data-rv-key='ps-portal-questionnaire'] button[data-act='ps.submitQ']")
+    t = toast(page)
+    assert FIRM_CHECKING in t and not CODE_RX.search(t), t
+    assert page.evaluate("id => ENGINE.caseById(id).gates.G03.status", case) == "pending"
+    # The Tax Consultant resolves the QUE codes: it is now the client's turn.
+    page.evaluate("""id => { const c = ENGINE.caseById(id); const tc = ACTOR.as('Tax Consultant');
+        ['QUE-04', 'QUE-03'].forEach((k) => ENGINE.openOf(c, k).forEach((x) => ENGINE.resolve(x, tc, { action: 'Confirmed with the client by phone' }))); render(); }""", case)
+    assert page.evaluate("id => ENGINE.gateState(ENGINE.caseById(id), 'G03').state", case) == "ready"
+    assert steps_of(page)["Questionnaire"] == "Your turn"
+    go(page, "Tax Consultant", "#papersync")
+    assert page.evaluate("id => Array.from(document.querySelectorAll('[data-rv-key=\"ps-board\"] .ps-col[data-col=\"questionnaire\"] a')).some((a) => a.getAttribute('href') === '#case-' + id)", case)
+    go(page, "Tax Consultant", "#portal-" + case)
+    # The client corrects one answer first (recorded as their own action), then sends the answers again: G03 passes.
+    key = page.evaluate("id => { const c = ENGINE.caseById(id); return ENGINE.QUESTIONS.map((q) => q.key).find((k) => !(k in c.questionnaire.answers)); }", case)
+    assert key, "every question is already answered on the questionnaire case"
+    n0 = page.evaluate("S.audit.length")
+    page.locator(f"#ps-q-{key}-0").check()
+    click(page, "[data-rv-key='ps-portal-questionnaire'] button[data-act='ps.submitQ']")
+    r = page.evaluate("""([id, n0]) => { const c = ENGINE.caseById(id); const n = S.audit.slice(n0).filter((a) => a.caseId === id);
+        return { g03: c.gates.G03.status, by: c.gates.G03.byType, answered: n.some((a) => a.role === 'Client' && a.result === 'Saved'),
+          released: n.some((a) => a.role === 'Client' && a.gate === 'G03' && a.result === 'Released') }; }""", [case, n0])
+    assert r == {"g03": "released", "by": "client", "answered": True, "released": True}, r
+    assert "Your answers are sent again" in toast(page)
+    assert steps_of(page)["Questionnaire"] == "Done"
+    assert page.locator("[data-rv-key='ps-portal-questionnaire'] input[type=radio]").count() == 0
+    assert "Sent your answers again" in page.locator("[data-rv-key='ps-portal-messages']").inner_text()
+    assert page.errors == []
+
+
+def test_what_you_did_shows_only_the_clients_own_actions_in_plain_words(page):
+    # M3: the questionnaire case's audit has a refused G03 release with QUE codes; the client never sees it.
+    case = page.evaluate("DEMO.keys.questionnaire")
+    assert page.evaluate("id => S.audit.some((a) => a.caseId === id && a.role === 'Client' && a.result === 'Refused' && /QUE-04/.test(a.text))", case)
+    open_portal(page, case)
+    msgs = page.locator("[data-rv-key='ps-portal-messages']").inner_text()
+    assert "Sent your questionnaire to your accountant" in msgs and "Opened your portal" in msgs
+    assert FIRM_CHECKING in msgs
+    assert "Refused" not in msgs and not CODE_RX.search(msgs), msgs
+    assert page.locator("[data-rv-key='ps-portal-messages'] .pill").count() == 0
+    # The remedy case: the client's decision and approval, in plain words; no "Released G14", no "Raised CLT-07".
+    rem = page.evaluate("DEMO.keys.remedy")
+    open_portal(page, rem)
+    msgs = page.locator("[data-rv-key='ps-portal-messages']").inner_text()
+    assert "Asked your accountant to act on SARS’s assessment" in msgs
+    assert "Approved version 1 of your return" in msgs
+    assert "Released" not in msgs and "Raised" not in msgs and not CODE_RX.search(msgs), msgs
+    assert page.errors == []
+
+
+def test_approval_card_holds_the_step_13_review_package(page):
+    # W4: the approval case at G06. The package has the five parts the workflow's step 13 lists, from the exact version asked for.
+    case = page.evaluate("DEMO.keys.approval")
+    open_portal(page, case)
+    want = page.evaluate("STEP[13].items.map((s) => s.replace(/\\.$/, ''))")
+    assert len(want) == 5
+    sec = page.locator("[data-rv-key='ps-portal-approval']")
+    summaries = sec.locator(".ps-pack-i > summary").all_inner_texts()
+    assert [s.split(". ", 1)[1] for s in summaries] == want, summaries
+    page.evaluate("document.querySelectorAll('.ps-pack-i').forEach((d) => { d.open = true; })")
+    part = lambda n: sec.locator(f".ps-pack-i[data-pack='{n}'] .ps-pack-b").inner_text()
+    d = page.evaluate("""id => { const v = ENGINE.curVersion(ENGINE.caseById(id)); const k = v.data.calc;
+        return { ti: CALC.rand(k.summary.taxableIncome), res: CALC.rand(Math.abs(k.summary.result)), refund: k.summary.result < 0, nt: CALC.rand(k.summary.normalTax),
+          paye: CALC.rand(k.summary.paye), decl: Object.values(v.data.itr12.declared).map((e) => [e.label, CALC.rand(e.amount)]), months: v.data.itr12.medical.months }; }""", case)
+    calc = part(1)
+    assert "Taxable income" in calc and d["ti"] in calc and d["nt"] in calc and d["res"] in calc
+    assert ("Refund due to you" if d["refund"] else "Amount you will owe SARS") in calc
+    assert "s6A" not in calc and "s11F" not in calc and "Tax on your taxable income" in calc  # plain labels
+    sched = part(2)
+    assert "Employment:" in sched and d["paye"] in sched and "Medical:" in sched
+    itr = part(3)
+    for label, amount in d["decl"]:
+        assert label in itr and amount in itr, label
+    assert f"Medical scheme membership: {d['months']} months" in itr
+    report = part(4)
+    assert d["ti"] in report and d["res"] in report and "SARS makes the final assessment" in report
+    matters = part(5)
+    assert "Change from last year" in matters and "Nothing else is still open" in matters
+    # The version hash and the declaration are still there, after the package.
+    assert sec.locator(".ps-hash").count() == 1 and sec.locator(".ps-decl").count() == 1
+    assert page.evaluate("""() => { const s = document.querySelector('[data-rv-key="ps-portal-approval"]');
+        return s.querySelector('.ps-pack').compareDocumentPosition(s.querySelector('.ps-decl')) & Node.DOCUMENT_POSITION_FOLLOWING; }""")
+    assert page.errors == []
+
+
+def test_review_package_shows_judgement_decisions_and_the_year_on_year_explanation(page):
+    # W4: the judgement case once the Tax Consultant has decided the home office line, explained the change and the case reached G06.
+    evil = "<img src=x onerror=alert(1)> dedicated room"
+    case = page.evaluate("""n => { const c = ENGINE.caseById(DEMO.keys.judgement); const tc = ACTOR.as('Tax Consultant');
+        c.inputs.lines.filter((l) => CALC.FIELDS[l.field].judgement).forEach((l) => ENGINE.decideItem(c, l.id, tc, { amount: l.amount, rationale: n }));
+        ENGINE.calculate(c, tc, { reason: 'Recalculated with the decision' });
+        ENGINE.exOf(c).filter((x) => ENGINE.isOpen(x)).forEach((x) => ENGINE.resolve(x, tc, { action: x.code === 'TAX-05' ? 'New employer from March, higher salary' : 'Decision recorded' }));
+        const r = ENGINE.drive(c, 'G06'); return r.ok ? c.id : 'drive failed: ' + r.why; }""", evil)
+    assert case.startswith("C"), case
+    open_portal(page, case)
+    page.evaluate("document.querySelectorAll('.ps-pack-i').forEach((d) => { d.open = true; })")
+    matters = page.locator("[data-rv-key='ps-portal-approval'] .ps-pack-i[data-pack='5'] .ps-pack-b").inner_text()
+    assert "Home office expenses" in matters and "Your accountant’s decision: " + evil in matters
+    assert "Your accountant’s explanation: New employer from March, higher salary" in matters
+    assert page.evaluate("document.querySelectorAll('#app img').length") == 0
     assert page.errors == []
 
 

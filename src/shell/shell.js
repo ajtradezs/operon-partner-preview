@@ -213,8 +213,8 @@ function viewSignIn() {
     return `<section class="signin"><div class="signin-card">${logo}<div class="card"><form data-form="code" class="stack" novalidate>
       <h1 class="sr">Simulated two-step sign-in</h1>
       <p>Signing in as <strong>${esc(S.authEmail)}</strong>.</p>
-      <label class="f" for="si-code">Simulated code · enter 123456<input id="si-code" name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></label>
-      <p class="hint">Demo: any 6 digits work. In the real app this is your authenticator code.</p>
+      <label class="f" for="si-code">Simulated code (any 6 digits, such as 123456)<input id="si-code" name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></label>
+      <p class="hint">In the real app this is your authenticator code.</p>
       <p class="err" id="si-err" role="alert"></p>
       <div class="row between"><button type="button" class="btn ghost" data-act="authBack">Back</button><button class="btn primary" type="submit">Sign in</button></div>
     </form></div></div></section>`;
@@ -223,7 +223,7 @@ function viewSignIn() {
     <h1 style="font-size:1.25rem">Sign in to ${esc(FIRM)}</h1>
     <label class="f" for="si-email">Work email<input id="si-email" name="email" type="email" autocomplete="off" placeholder="roelof.demo@example.test" value="${esc(S.authEmail)}"></label>
     <label class="f" for="si-role">See the preview as<select id="si-role" name="role">${ROLES.map((r) => `<option${r === S.role ? ' selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
-    <p class="hint">Simulation only. Use aidan.demo@example.test, johan.demo@example.test or roelof.demo@example.test, then code 123456. No password or real authenticator is needed. You can switch role in the header. Clients never sign in here: they act through the PaperSync portal.</p>
+    <p class="hint">Simulation only. Any email address works (for example roelof.demo@example.test), then any 6 digits as the code (such as 123456). No password or real authenticator is needed. You can switch role in the header. Clients never sign in here: they act through the PaperSync portal.</p>
     <p class="err" id="si-err" role="alert"></p>
     <button class="btn primary" type="submit">Continue</button>
   </form></div></div></section>`;
@@ -320,8 +320,8 @@ function stepUp(why, then) {
   if (Date.now() < S.stepUpUntil) { then(); return; }
   modal('Confirm it’s you', `<p>${esc(why)}</p>
     <label class="f" for="su-pw">Password<input id="su-pw" name="pw" type="password" autocomplete="off"></label>
-    <label class="f" for="su-code">Simulated code · enter 123456<input id="su-code" name="code" inputmode="numeric" maxlength="6" class="code" autocomplete="off"></label>
-    <p class="hint">Demo: any password and any 6 digits work. You won’t be asked again for 5 minutes.</p>`, 'Confirm', (fd) => {
+    <label class="f" for="su-code">Simulated code (any 6 digits, such as 123456)<input id="su-code" name="code" inputmode="numeric" maxlength="6" class="code" autocomplete="off"></label>
+    <p class="hint">Demo: any password works. You won’t be asked again for 5 minutes.</p>`, 'Confirm', (fd) => {
     if (!String(fd.pw || '').length) return 'Enter your password. Any password works in the demo.';
     if (!/^\d{6}$/.test(String(fd.code || '').trim())) return 'Enter the 6-digit code. Any 6 digits work in the demo.';
     S.stepUpUntil = Date.now() + 5 * 60000;

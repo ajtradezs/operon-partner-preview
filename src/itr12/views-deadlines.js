@@ -157,7 +157,7 @@
     else if (C.res) {
       const ex = C.res.rows.filter((r) => !r.business);
       countRes = `<div class="adm-result" role="status"><p class="adm-big">${esc(plural(C.res.business, 'business day'))}</p><p class="small muted">${esc(plural(C.res.total, 'calendar day') + ' counted, ' + C.res.excluded + ' excluded.')}</p>
-        ${ex.length ? `<details><summary>Excluded days (${ex.length})</summary><ul class="adm-days">${ex.slice(0, 120).map((r) => `<li><span class="mono">${esc(r.date)}</span> ${esc(r.reason)}</li>`).join('')}</ul>${ex.length > 120 ? '<p class="small muted">First 120 shown.</p>' : ''}</details>` : ''}</div>`;
+        ${ex.length ? `<details><summary>Excluded days (${ex.length})</summary><ul class="adm-days">${ex.slice(0, 120).map((r) => `<li><span class="mono">${VK.date(r.date)}</span> ${esc(r.reason)}</li>`).join('')}</ul>${ex.length > 120 ? '<p class="small muted">First 120 shown.</p>' : ''}</details>` : ''}</div>`;
     }
     let addRes = '';
     if (A.err) addRes = `<p class="err">${esc(A.err)}</p>`;

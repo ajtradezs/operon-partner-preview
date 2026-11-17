@@ -99,7 +99,8 @@ def test_f03_open_incident_stops_g18_after_sec_severity_is_lowered(page):
       const y = ENGINE.raiseManual(d, 'SEC-05', io, { note: 'Shared admin login found' }).exception;
       ENGINE.setSeverity(y, io, 'S3', { reason: 'Access already narrowed' }); ENGINE.approveSeverity(y, rc);
       o.tr = ENGINE.transmit(u, ia, 'success').ok; o.dSub = d.submission; o.ySev = y.sev;
-      // F2: an S1 SEC code lowered to S4 no longer blocks by severity, but its open incident still stops the send.
+      // F2: an S1 SEC code lowered to S4 no longer hard-stops by severity, but its open incident still stops the send. The
+      // register rules (review finding R3): lowering the severity never changes Blocking, so SEC-02 stays Blocking Yes.
       const e = H.at('G09');
       const z = ENGINE.raiseManual(e, 'SEC-02', io, { note: 'Possible exposure' }).exception;
       ENGINE.setSeverity(z, io, 'S4', { reason: 'Contained' }); ENGINE.approveSeverity(z, rc);
@@ -113,7 +114,7 @@ def test_f03_open_incident_stops_g18_after_sec_severity_is_lowered(page):
     assert r["inc"] == "open"
     assert not r["sign"]["ok"] and "incident" in r["sign"]["why"].lower() and not r["sign2"], r["sign"]
     assert r["ySev"] == "S3" and not r["tr"] and r["dSub"] is None, "transmit is refused while an incident on the case is open"
-    assert r["zSev"] == ["S4", "No"]
+    assert r["zSev"] == ["S4", "Yes"], "The register rules: a severity change never alters Blocking (review finding R3)"
     assert r["f2Sign"] is not True and r["f2Sub"] is None, r
 
 
@@ -183,8 +184,11 @@ def test_f06_reject_or_withhold_after_approval_is_a_withdrawal(page):
       ENGINE.portal(d, 'reject', { reason: 'The numbers are wrong' });
       const x2 = H.ex(d, 'CLT-02');
       o.reject = [clt(d), d.gates.G06.status, ENGINE.canRelease(d, 'G09', tc).ok];
-      o.rejectResolve = [ENGINE.resolve(x2, ACTOR.client(d.clientId), { action: 'ok' }).ok, ENGINE.resolve(x2, tc, { action: 'ok' }).ok,
-                         ENGINE.resolverCheck(x2, ACTOR.client(d.clientId)), ENGINE.resolverCheck(x2, ad)];
+      // CLT-02 belongs to the Tax Consultant (register; review finding R4): re-approving alone does not clear it.
+      o.rejectApproveFirst = approve(d);
+      o.rejectResolve = [ENGINE.resolve(x2, ACTOR.client(d.clientId), { action: 'ok' }).ok, ENGINE.resolve(x2, ad, { action: 'ok' }).ok,
+                         ENGINE.resolverCheck(x2, ACTOR.client(d.clientId)), ENGINE.resolverCheck(x2, ad),
+                         ENGINE.resolve(x2, tc, { action: 'Concern investigated with the client: the figures stand, no revised pack needed' }).ok];
       o.rejectApprove = approve(d); o.x2 = x2.status;
       // at G18 (finding 46)
       const g = H.at('G18'); const t = H.itx(g);
@@ -201,7 +205,9 @@ def test_f06_reject_or_withhold_after_approval_is_a_withdrawal(page):
     assert r["withholdResolve"] == [False, False], "PORTAL_ONLY codes are not resolved by ENGINE.resolve, whoever calls it"
     assert r["withholdApprove"] and r["x6"] in ("resolved", "closed"), "A fresh portal approval clears the withdrawal"
     assert r["reject"] == [["CLT-02"], "invalidated", False], r["reject"]
+    assert not r["rejectApproveFirst"], "CLT-02 blocks G06 until its owner, the Tax Consultant, resolves it (review finding R4)"
     assert r["rejectResolve"][:2] == [False, False] and r["rejectResolve"][2] and r["rejectResolve"][3], r["rejectResolve"]
+    assert r["rejectResolve"][4], "The Tax Consultant resolves CLT-02 with the investigation record"
     assert r["rejectApprove"] and r["x2"] in ("resolved", "closed")
     assert r["g18"] == [["CLT-06"], "invalidated", "cancelled"], r["g18"]
     assert r["g18Approve"]

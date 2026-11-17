@@ -55,10 +55,22 @@ body.rv-arranging .cb-card{cursor:default}
 .cs-21-bar{height:8px;border-radius:999px;background:var(--op-surface-2);border:1px solid var(--op-rule);overflow:hidden}
 .cs-21-bar>span{display:block;height:100%;background:var(--op-accent)}
 .vk-sec dl.facts dd{min-width:0;overflow-wrap:anywhere}
+/* Gate checklist items with their tick, the values form and the remedy chooser */
+.vk-row.cs-req{grid-template-columns:auto minmax(0,1fr) auto;align-items:center}
+.cs-reqact{justify-self:end}
+.cs-reqact .locked{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.cs-vals{display:flex;flex-direction:column;gap:10px}
+.cs-val{border:1px solid var(--op-rule);border-radius:8px;padding:8px 10px;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:8px}
+.cs-val legend{padding:0 4px}
+.cs-val-med{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:8px}
+.cs-remedy{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:6px}
 
 @media (max-width:760px){
   .cb-cols{grid-template-columns:minmax(0,1fr)}
   .cb-last{flex-wrap:wrap}
+  .vk-row.cs-req{grid-template-columns:auto minmax(0,1fr)}
+  .cs-reqact{grid-column:1 / -1;justify-self:start}
+  .cs-reqact .locked{align-items:flex-start}
   .vk-cards tr.cs-now{background:var(--op-accent-soft)}
   .vk-cards tr.cs-now td,.vk-cards tr.cs-diff td{background:transparent}
   .vk-cards tr.cs-diff{background:var(--op-warning-soft)}

@@ -145,8 +145,10 @@
     let act = '';
     if (ENGINE.isOpen(x)) act = VK.exceptionBtn({ x, need: 'resolve' });
     else if (x.status === 'resolved' && x.secondary) act = VK.exceptionBtn({ x, need: 'close' });
+    const plat = /^Platform /.test(x.owner) || /^Platform /.test(x.secondary || '');
     return VK.section('ops-exception-resolution', 'Resolution and secondary review', VK.facts(pairs) + (act ? `<div class="row">${act}</div>` : ''), {
-      intro: esc(x.secondary ? 'The owner resolves it; then a different person in the ' + x.secondary + ' role closes it. It keeps blocking until it is closed.' : 'The owner resolves it. Codes with no secondary reviewer close when their gates are done.'),
+      intro: esc((x.secondary ? 'The owner resolves it; then a different person in the ' + x.secondary + ' role closes it. It keeps blocking until it is closed.' : 'The owner resolves it. Codes with no secondary reviewer close when their gates are done.')
+        + (plat ? ' The register gives part of this to the platform team, which works outside the firm: the preview simulates it, and records the platform team, not you.' : '')),
     });
   }
   function severityBlock(x) {
@@ -160,7 +162,7 @@
       else btns.push(`<span class="lock">${I.hourglass}${esc('Waiting for the Records/Compliance Owner')}</span>`);
     }
     return VK.section('ops-exception-severity', 'Severity', VK.facts(pairs) + (btns.length ? `<div class="row ops-btns">${btns.join('')}</div>` : ''), {
-      intro: esc('S1 is a hard stop for the case; S2 blocks its gates; S3 blocks only the affected item; S4 is logged. Anyone may raise a severity at once. Lowering an S1 or S2 needs the Records/Compliance Owner’s approval, by a different person.'),
+      intro: esc('S1 is a hard stop for the whole case. Otherwise the register’s Blocking column decides: a blocking code stops the gates it is mapped to, whether it is S2 or S3. Anyone may raise a severity at once. Lowering an S1 or S2 needs the Records/Compliance Owner’s approval, by a different person.'),
     });
   }
   function overrideBlock(x) {
@@ -185,7 +187,7 @@
     const fb = x.fallback;
     if (!fb) return VK.section('ops-exception-fallback', 'Manual fallback', VK.empty(x.code + ' is not a Conditional code, so it has no manual fallback. Only ' + CONDITIONAL.join(', ') + ' have one.'));
     const rec = fb.recorded; const rcn = fb.reconciled;
-    const pairs = [['Recorded', rec ? `${esc(VK.who(rec.by))} · ${VK.when(rec.at)}${rec.ref ? ` · <span class="mono">${esc(rec.ref)}</span>` : ''}${rec.note ? `<div class="small muted">${esc(VK.scrub(rec.note))}</div>` : ''}` : '<span class="muted">Not yet</span>'],
+    const pairs = [['Recorded', rec ? `${esc(VK.who(rec.by))} · ${VK.when(rec.at)}${rec.ref ? ` · <span class="mono">${esc(VK.scrub(rec.ref))}</span>` : ''}${rec.note ? `<div class="small muted">${esc(VK.scrub(rec.note))}</div>` : ''}` : '<span class="muted">Not yet</span>'],
       ['Independently reconciled', rcn ? `${esc(VK.who(rcn.by))} · ${VK.when(rcn.at)}${rcn.found === false ? ' · ' + esc('not processed') : ''}${rcn.note ? `<div class="small muted">${esc(VK.scrub(rcn.note))}</div>` : ''}` : '<span class="muted">Not yet</span>']];
     // Only AI-06 records a free-text fallback. The others have a real fallback action: the manual filing on the SARS link page
     // (INT-03, INT-13) or confirming the dates from the notice (INT-15). A free-text note must not stand in for those.
@@ -284,7 +286,7 @@
     const tx = x.code === 'INT-13' && x.txId ? ENGINE.txById(x.txId) : null;
     const rec = x.fallback && x.fallback.recorded;
     modal('Reconcile the fallback for ' + x.id, `${head(x)}
-      ${rec ? VK.facts([['Recorded by', esc(VK.who(rec.by))], ['Reference', esc(rec.ref || 'None')], ['Note', esc(VK.scrub(rec.note || ''))]]) : ''}
+      ${rec ? VK.facts([['Recorded by', esc(VK.who(rec.by))], ['Reference', esc(VK.scrub(rec.ref || 'None'))], ['Note', esc(VK.scrub(rec.note || ''))]]) : ''}
       ${tx ? `<fieldset class="ops-radios"><legend class="small muted">What the eFiling record shows (simulated)</legend>
         <label><input type="radio" name="processed" value="yes" checked> The manual filing is on eFiling: reconcile it to the case</label>
         <label><input type="radio" name="processed" value="no"> It is not on eFiling: mark ${esc(tx.id)} as not processed</label></fieldset>` : ''}

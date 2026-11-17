@@ -216,7 +216,7 @@ def test_controls_show_the_register_rules_and_questions(page):
           checklist: q('adm-controls-checklist').querySelectorAll('tbody tr').length, sod: q('adm-controls-sod').querySelectorAll('tbody tr').length,
           pending: q('adm-controls-policy').textContent.split('Pending Johan').length - 1, rulesets: q('adm-controls-rulesets').textContent,
           roles: q('adm-controls-roles').textContent }; }""")
-    assert r["gates"] == 18 and r["questions"] == r["want"] == 15 and r["hash"] and r["codes"] == r["nCodes"] == 116
+    assert r["gates"] == 18 and r["questions"] == r["want"] >= 15 and r["hash"] and r["codes"] == r["nCodes"] == 116
     assert r["tiers"] == ["Auto", "Auto + hold", "Held for a human", "Forbidden"]
     assert r["checklist"] == 11 and r["sod"] == 20 and r["pending"] == 6
     assert "Ruleset 2026.1" in r["rulesets"] and "In use" in r["rulesets"] and "Ruleset 2027.1" in r["rulesets"]

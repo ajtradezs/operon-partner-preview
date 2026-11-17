@@ -35,6 +35,32 @@ def test_sign_in_as_another_role_and_switch(session):
     assert not s.errors, s.errors
 
 
+def test_sign_in_and_step_up_text_match_what_the_code_accepts(session):
+    # m4: the code check accepts any 6 digits, so no text may say "enter 123456" as if only that code works.
+    s = session()
+    p = s.page
+    assert "Any email address works" in p.locator("form[data-form=email] .hint").inner_text()
+    p.fill("#si-email", "someone.else@example.test")
+    p.click("form[data-form=email] button[type=submit]")
+    form = p.locator("form[data-form=code]").inner_text()
+    assert "any 6 digits" in form and "enter 123456" not in form, form
+    p.fill("#si-code", "654321")
+    p.click("form[data-form=code] button[type=submit]")
+    p.wait_for_selector(".rv-bar:not([hidden])")
+    assert p.evaluate("S.signedIn") is True
+    # The step-up dialog says the same and accepts any 6 digits.
+    p.evaluate("() => { S.stepUpUntil = 0; window.__su = 0; stepUp('Test step-up.', () => { window.__su = 1; }); }")
+    p.wait_for_selector("#dlg[open]")
+    dlg = p.locator("#dlg").inner_text()
+    assert "any 6 digits" in dlg and "enter 123456" not in dlg, dlg
+    p.fill("#su-pw", "anything")
+    p.fill("#su-code", "000111")
+    p.click("#dlg-ok")
+    p.wait_for_function("window.__su === 1")
+    assert p.evaluate("S.stepUpUntil > Date.now()")
+    assert not s.errors, s.errors
+
+
 def test_people_page_locks_for_non_administrators(session):
     s = session().sign_in()
     s.go("#people")

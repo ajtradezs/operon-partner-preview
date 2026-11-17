@@ -42,6 +42,8 @@
 .ops-radios legend{margin-bottom:6px}
 .ops-radios label{display:flex;gap:10px;align-items:flex-start;font-size:14px}
 .ops-radios input{margin-top:3px;flex:none}
+/* The simulated ITA34: which figure differs and SARS's amount, side by side when there is room */
+.ops-ita-diff{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:8px}
 
 @media (max-width:760px){
   .ops-btns,.vk-tablewrap td.vk-act .ops-btns{justify-content:flex-start;max-width:none}

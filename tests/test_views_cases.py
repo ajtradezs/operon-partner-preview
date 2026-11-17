@@ -258,14 +258,14 @@ def test_real_drag_is_gate_checked_and_defers_rendering(page):
 
 def test_case_page_actions_go_through_engine(page):
     case = case_of(page, "judgement")
-    go(page, "Administrator", "#case-" + case)
-    n0 = page.evaluate("S.audit.length")
-    click(page, "[data-rv-key='cases-case-calc'] button[data-act='cases.recalc']")
-    page.wait_for_selector("#dlg[open]")
-    page.click("#dlg-ok")
-    page.wait_for_function("document.getElementById('dlg-err').textContent.startsWith('Not done')")
-    assert page.evaluate("([id, n]) => ENGINE.caseById(id).versions.length === 1 && S.audit.slice(n).some((a) => a.result === 'Refused' && a.who === 'AD1')", [case, n0])
-    page.click("#dlg button[data-close]")
+    # Recalculate and Decide are the Tax Consultant's: every other role sees them locked, with the reason (finding M4).
+    for role in ["Administrator", "Integration Administrator", "Information Officer", "Records/Compliance Owner"]:
+        go(page, role, "#case-" + case)
+        r = page.evaluate("""() => { const sec = document.querySelector('[data-rv-key="cases-case-calc"]');
+            return { live: sec.querySelectorAll('button[data-act="cases.recalc"], button[data-act="cases.decide"]').length,
+              locked: Array.from(sec.querySelectorAll('.locked')).map((e) => [e.querySelector('button').textContent, e.querySelector('.lock').textContent]) }; }""")
+        assert r["live"] == 0 and ["Recalculate", "Tax Consultant only"] in r["locked"] and ["Decide", "Tax Consultant only"] in r["locked"], (role, r)
+    assert page.evaluate("id => ENGINE.caseById(id).versions.length", case) == 1
 
     go(page, "Tax Consultant", "#case-" + case)
     click(page, "[data-rv-key='cases-case-calc'] button[data-act='cases.decide']")
@@ -356,13 +356,13 @@ def test_four_source_analysis_lists_the_open_exceptions_on_each_topic(page):
     """The plan's documents case: the IRP5 differs from SARS's pre-populated figure (DOC-02). It has no extracted values yet, so only
     the exception carries the difference; it must show on the employment row, not a 'Consistent' pill."""
     go(page, "Tax Consultant", "#case-" + case_of(page, "documents"))
-    rows = page.evaluate("""() => Array.from(document.querySelectorAll('[data-rv-key="cases-case-sources"] tbody tr')).map((tr) => ({
-        topic: tr.cells[0].textContent, codes: Array.from(tr.cells[5].querySelectorAll('.vk-code')).map((e) => e.textContent), text: tr.cells[5].textContent }))""")
+    rows = page.evaluate("""() => Array.from(document.querySelectorAll('[data-rv-key="cases-case-sources"] tbody tr')).map((tr) => { const last = tr.cells[tr.cells.length - 1]; return {
+        topic: tr.cells[0].textContent, codes: Array.from(last.querySelectorAll('.vk-code')).map((e) => e.textContent), text: last.textContent }; })""")
     emp = next(r for r in rows if "employed" in r["topic"])
     assert "DOC-02" in emp["codes"] and "AI-01" in emp["codes"] and "differs from the SARS pre-populated" in emp["text"] and "Consistent" not in emp["text"]
     go(page, "Tax Consultant", "#case-" + case_of(page, "questionnaire"))
     rows = page.evaluate("""() => Object.fromEntries(Array.from(document.querySelectorAll('[data-rv-key="cases-case-sources"] tbody tr')).map((tr) => [
-        tr.cells[0].textContent, Array.from(tr.cells[5].querySelectorAll('.vk-code')).map((e) => e.textContent)]))""")
+        tr.cells[0].textContent, Array.from(tr.cells[tr.cells.length - 1].querySelectorAll('.vk-code')).map((e) => e.textContent)]))""")
     assert any("rental" in k and "QUE-03" in v for k, v in rows.items()) and any("retirement" in k and "QUE-04" in v for k, v in rows.items())
     assert page.errors == []
 
@@ -428,4 +428,171 @@ def test_case_page_survives_a_stub_calculation_and_attribute_quotes(page):
         r = page.evaluate("n => ({ attr: document.querySelectorAll('[onmouseover], [data-pwned], [data-pwned2]').length, shown: document.getElementById('app').textContent.includes(n) })", evil)
         assert r == {"attr": 0, "shown": True}, h
     assert page.locator("[data-rv-key='cases-case-calc']").count() == 1
+    assert page.errors == []
+
+
+# ---------------------------------------------------------------- the workflow's own steps on the case page (review findings)
+OTHERS = ["Administrator", "Integration Administrator", "Information Officer", "Records/Compliance Owner"]
+
+
+def req_buttons(pg, case, gate):
+    """The gate checklist rows for one gate: each undone item's live button key, or its lock text."""
+    return pg.evaluate("""([id, g]) => Array.from(document.querySelectorAll('[data-rv-key="cases-case-checklist"] .cs-req')).filter((r) => r.querySelector('.vk-gate b').textContent === g)
+        .map((r) => { const b = r.querySelector('button[data-act="cases.req"]'); const l = r.querySelector('.lock'); return { live: b ? b.dataset.key : null, lock: l ? l.textContent : null }; })""", [case, gate])
+
+
+def test_gate_checklist_items_are_ticked_on_the_case_page_by_the_gate_owner(page):
+    """W1 and the flow defects: G02's comparison, G10's and G11's items and G13's item each get a 'Mark done' button for the gate's
+    owner (ENGINE.markReq, audited); every other role sees a lock saying who does it."""
+    fresh = page.evaluate("() => ENGINE.newCase(ENGINE.newClient({ name: 'Thandi Checklist' }), {}).id")
+    cases = {"G02": fresh, "G10": case_of(page, "declaration"), "G11": case_of(page, "verification")}
+    # G13: the assessment case once its checklist exists (it is set when the ITA34 arrives).
+    cases["G13"] = case_of(page, "assessment")
+    for g, cid in cases.items():
+        todo = page.evaluate("([id, g]) => (ENGINE.caseById(id).req[g] || []).filter((r) => !r.done).map((r) => r.key)", [cid, g])
+        assert todo, (g, cid)
+        for role in OTHERS:
+            go(page, role, "#case-" + cid)
+            # Items already done (G10's draft by the AI) show neither a button nor a lock; every item still to do shows the lock.
+            rows = [r for r in req_buttons(page, cid, g) if r != {"live": None, "lock": None}]
+            assert len(rows) == len(todo) and all(r["live"] is None and r["lock"] == f"Done by the Tax Consultant, who owns {g}" for r in rows), (g, role, rows)
+        go(page, "Tax Consultant", "#case-" + cid)
+        assert [r["live"] for r in req_buttons(page, cid, g) if r != {"live": None, "lock": None}] == todo, g
+        n0 = page.evaluate("S.audit.length")
+        for k in todo:
+            click(page, f"[data-rv-key='cases-case-checklist'] button[data-act='cases.req'][data-case='{cid}'][data-gate='{g}'][data-key='{k}']")
+        r = page.evaluate("""([id, g, n]) => { const c = ENGINE.caseById(id); return { done: c.req[g].every((x) => x.done),  // TC1's ticks are counted in the audit check below; G10's draft was the AI's
+            audit: S.audit.slice(n).filter((a) => a.caseId === id && a.gate === g && a.result === 'Done' && a.who === 'TC1').length,
+            why: ENGINE.canRelease(c, g, ACTOR.me()).why, labels: c.req[g].map((x) => x.label), toast: document.getElementById('toasts').textContent }; }""", [cid, g, n0])
+        assert r["done"] and r["audit"] == len(todo), (g, r)
+        assert not any(lbl in r["why"] for lbl in r["labels"]), (g, r["why"])
+        assert "Done: " in r["toast"], r["toast"]
+        assert all(r == {"live": None, "lock": None} for r in req_buttons(page, cid, g)), g
+    assert page.errors == []
+
+
+def test_values_are_recorded_per_document_by_the_tax_consultant(page):
+    """The flow defect: the values read from each checked document are recorded on the case page (ENGINE.setInputs), one form per
+    document, by the Tax Consultant only; the other documents' values are kept and a bad amount is refused in the dialog."""
+    case = case_of(page, "judgement")
+    irp5 = page.evaluate("id => ENGINE.caseById(id).docs.find((d) => d.kind === 'irp5' && d.status === 'validated').id", case)
+    for role in OTHERS:
+        go(page, role, "#case-" + case)
+        r = page.evaluate("""() => { const sec = document.querySelector('[data-rv-key="cases-case-documents"]');
+            return { live: sec.querySelectorAll('button[data-act="cases.values"]').length, locks: Array.from(sec.querySelectorAll('.locked .lock')).map((e) => e.textContent) }; }""")
+        assert r["live"] == 0 and r["locks"] and all(t == "Tax Consultant only" for t in r["locks"]), (role, r)
+    go(page, "Tax Consultant", "#case-" + case)
+    before = page.evaluate("([id, d]) => { const c = ENGINE.caseById(id); return { all: c.inputs.lines.length, mine: c.inputs.lines.filter((l) => l.docId === d).map((l) => [l.id, l.field, l.amount]) }; }", [case, irp5])
+    assert before["mine"]
+    click(page, f"[data-rv-key='cases-case-documents'] button[data-act='cases.values'][data-doc='{irp5}']")
+    page.wait_for_selector("#dlg[open]")
+    shown = page.evaluate("n => Array.from({ length: n }, (_, i) => [document.getElementById('cs-v-f' + i).value, Number(document.getElementById('cs-v-a' + i).value)])", len(before["mine"]))
+    assert shown == [[f, a] for _, f, a in before["mine"]], shown
+    blank = len(before["mine"])
+    page.select_option(f"#cs-v-f{blank}", "paye")
+    page.fill(f"#cs-v-a{blank}", "twelve")
+    page.click("#dlg-ok")
+    page.wait_for_function("document.getElementById('dlg-err').textContent.includes('give the amount as a number')")
+    page.fill(f"#cs-v-a{blank}", "")
+    page.select_option(f"#cs-v-f{blank}", "")
+    page.fill("#cs-v-a0", str(before["mine"][0][2] + 1000))
+    n0 = page.evaluate("S.audit.length")
+    page.click("#dlg-ok")
+    page.wait_for_function("!document.getElementById('dlg').open")
+    after = page.evaluate("""([id, d, n]) => { const c = ENGINE.caseById(id); return { all: c.inputs.lines.length, mine: c.inputs.lines.filter((l) => l.docId === d).map((l) => [l.id, l.field, l.amount]),
+        audit: S.audit.slice(n).some((a) => a.caseId === id && a.result === 'Recorded' && a.who === 'TC1'), why: ENGINE.criteria(c, 'G05').join('; '),
+        toast: document.getElementById('toasts').textContent }; }""", [case, irp5, n0])
+    want = [list(x) for x in before["mine"]]
+    want[0][2] += 1000
+    assert after["all"] == before["all"] and after["mine"] == want and after["audit"], after
+    assert "rerun the calculation" in after["why"] and "Recalculate to use them" in after["toast"], after
+    assert page.errors == []
+
+
+def test_remedy_route_is_chosen_on_the_case_page_by_the_tax_consultant(page):
+    """The flow defect: after the client instructs the firm, the Tax Consultant chooses the remedy route with its grounds and
+    evidence on the case page (ENGINE.chooseRemedy); each route shows its statutory deadline; other roles see it locked."""
+    cid = page.evaluate("""() => { const c = ENGINE.caseById(DEMO.keys.assessment);
+        const x = ENGINE.openOf(c, 'ASM-02')[0]; ENGINE.resolve(x, ACTOR.as('Tax Consultant'), { action: 'Explained' });
+        (c.req.G13 || []).forEach((r) => ENGINE.markReq(c, 'G13', r.key, ACTOR.as('Tax Consultant')));
+        if (c.gates.G12.status !== 'released') ENGINE.release(c, 'G12', ACTOR.as('Tax Consultant'));
+        ENGINE.release(c, 'G13', ACTOR.as('Tax Consultant'));
+        ENGINE.portal(c, 'decide', { choice: 'instruct', note: 'The retirement annuity was R60,000.00' }); return c.id; }""")
+    assert page.evaluate("id => { const c = ENGINE.caseById(id); return ENGINE.applies(c, 'G15') && !c.remedy; }", cid)
+    for role in OTHERS:
+        go(page, role, "#case-" + cid)
+        r = page.evaluate("""() => { const sec = document.querySelector('[data-rv-key="cases-case-ita34"]');
+            return { live: sec.querySelectorAll('button[data-act="cases.remedy"]').length, lock: Array.from(sec.querySelectorAll('.locked .lock')).map((e) => e.textContent) }; }""")
+        assert r == {"live": 0, "lock": ["Tax Consultant only"]}, (role, r)
+    go(page, "Tax Consultant", "#case-" + cid)
+    click(page, f"[data-rv-key='cases-case-ita34'] button[data-act='cases.remedy'][data-case='{cid}']")
+    page.wait_for_selector("#dlg[open]")
+    routes = page.evaluate("Array.from(document.querySelectorAll('#dlg input[name=route]')).map((e) => e.value)")
+    assert routes == ["rfc", "reasons", "objection", "appeal", "payment", "advice"]
+    want = page.evaluate("id => { const r = ENGINE.remedyDeadline(ENGINE.caseById(id), 'reasons'); return fDate(VK.toDay(r.deadline)); }", cid)
+    assert want in page.locator("#dlg label:has(input[value='reasons'])").inner_text()
+    page.check("#dlg input[value='reasons']")
+    page.fill("#cs-rem-ev", "SARS's reasons for the retirement annuity adjustment are needed first")
+    page.click("#dlg-ok")
+    page.wait_for_function("!document.getElementById('dlg').open")
+    r = page.evaluate("""id => { const c = ENGINE.caseById(id); return { route: c.remedy.route, by: c.remedy.by, rem01: ENGINE.openOf(c, 'REM-01').length,
+        toast: document.getElementById('toasts').textContent, shown: document.querySelector('[data-rv-key="cases-case-ita34"]').textContent.includes('Request for reasons') }; }""", cid)
+    assert r["route"] == "reasons" and r["by"] == "TC1" and r["rem01"] == 0 and r["shown"], r
+    assert f"Chose the remedy: Request for reasons, due {want}." in r["toast"], r["toast"]
+    assert page.errors == []
+
+
+def test_four_source_analysis_uses_step_6_sources_and_never_says_consistent_on_a_gap(page):
+    """M1 and W8: the columns are step 6's four sources (last year's ITR12, SARS pre-populated, last year's document request, this
+    year's questionnaire) with the documents as evidence; 'Consistent' never shows on a topic the client did not answer or on one
+    with an open exception, including a judgement item on one of its values."""
+    heads = None
+    for key in ["onboarding", "details", "questionnaire", "documents", "judgement", "calcReady", "approval", "ready", "assessment", "closed"]:
+        go(page, "Tax Consultant", "#case-" + case_of(page, key))
+        r = page.evaluate("""() => { const sec = document.querySelector('[data-rv-key="cases-case-sources"]');
+            return { heads: Array.from(sec.querySelectorAll('thead th')).map((e) => e.textContent), intro: sec.querySelector('.vk-sec-intro').textContent,
+              rows: Array.from(sec.querySelectorAll('tbody tr')).map((tr) => ({ topic: tr.cells[0].textContent, q: tr.cells[4].textContent, cmp: tr.cells[tr.cells.length - 1].textContent,
+                codes: Array.from(tr.cells[tr.cells.length - 1].querySelectorAll('.vk-code')).map((e) => e.textContent) })) }; }""")
+        heads = r["heads"]
+        for row in r["rows"]:
+            if "Not answered" in row["q"] or row["codes"]:
+                assert "Consistent" not in row["cmp"], (key, row)
+        for src in ["previous submitted ITR12", "current SARS pre-populated ITR12", "previous firm supporting-document request", "current-year client tax questionnaire"]:
+            assert src in r["intro"], (key, src)
+    assert heads == ["Topic", "Last year’s ITR12", "SARS pre-populated", "Last year’s document request", "This year’s questionnaire", "Evidence: documents and values", "Comparison"], heads
+    # The judgement case: the open TAX-02 sits on the home office value, so the home office row lists it and is not 'Consistent'.
+    case = case_of(page, "judgement")
+    page.evaluate("id => { const c = ENGINE.caseById(id); if (!c.questionnaire.required.includes('homeoffice')) c.questionnaire.required.push('homeoffice'); }", case)
+    go(page, "Tax Consultant", "#case-" + case)
+    home = page.evaluate("""() => { const tr = Array.from(document.querySelectorAll('[data-rv-key="cases-case-sources"] tbody tr')).find((t) => /home office/i.test(t.cells[0].textContent));
+        const last = tr.cells[tr.cells.length - 1]; return { codes: Array.from(last.querySelectorAll('.vk-code')).map((e) => e.textContent), text: last.textContent }; }""")
+    assert "TAX-02" in home["codes"] and "Consistent" not in home["text"], home
+    assert page.errors == []
+
+
+def test_file_names_with_id_and_tax_numbers_stay_masked(page):
+    """D1: an uploaded file named with the client's own ID number and tax reference, with underscores or letters next to the digits,
+    shows masked on the case page, the client page, Today, the audit trail and the exceptions."""
+    case = case_of(page, "documents")
+    who = page.evaluate("""id => { const c = ENGINE.caseById(id); const cl = ENGINE.clientOf(c); const it = c.items.find((x) => x.kind === 'irp5') || c.items[0];
+        ['IRP5_' + cl.taxRef + '_' + cl.idNo + '_2026.pdf', 'IRP5 2026 TR' + cl.taxRef + ' ID' + cl.idNo + '.pdf'].forEach((name) =>
+          ENGINE.portal(c, 'upload', { itemId: it.id, file: { name, size: 245760 } }));
+        return { id: cl.idNo, tax: cl.taxRef, client: cl.id }; }""", case)
+    for role in ["Tax Consultant", "Administrator"]:
+        for h in ["#case-" + case, "#client-" + who["client"], "#today", "#audit", "#exceptions"]:
+            go(page, role, h)
+            html = page.evaluate("document.getElementById('app').outerHTML")
+            assert who["id"] not in html and who["tax"] not in html, (role, h)
+    assert page.evaluate("VK.scrub('Uploaded IRP5_9061007331_2026.pdf and ID8804125185084x')") == "Uploaded IRP5_••••••7331_2026.pdf and ID880412•••••••x"
+    assert page.errors == []
+
+
+def test_lineage_names_the_calculator_field_and_free_text_has_no_iso_dates(page):
+    """m3, screen part: the lineage shows the calculator field's name, not its internal key, and free text reads dates as dates."""
+    case = case_of(page, "judgement")
+    go(page, "Tax Consultant", "#case-" + case)
+    r = page.evaluate("""id => { const c = ENGINE.caseById(id); const rows = Array.from(document.querySelectorAll('[data-rv-key="cases-case-documents"] table')[1].querySelectorAll('tbody tr'));
+        return rows.map((tr, i) => [tr.cells[5].textContent, CALC.FIELDS[CALC.lineage(c)[i].field].label]); }""", case)
+    assert r and all(shown == label for shown, label in r), r
+    assert page.evaluate("VK.scrub('3 business days left to 2026-11-12; raw date \"2026-13-45\"')") == '3 business days left to 12 Nov 2026; raw date "2026-13-45"'
     assert page.errors == []

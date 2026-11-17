@@ -202,7 +202,12 @@ const DEMO_SEED = (() => {
       ['2026-08-03 09:00', () => { open('declaration', { items: ['irp5', 'medical', 'ra'], priorYear: ['employment', 'medical', 'ra'] }); drive('declaration', 'G05'); }],
       ['2026-08-24 10:00', () => { extract('declaration', IRP5(587000, 133900).concat(MED(50400, 7200), [ln('ra', 'Retirement annuity certificate: contributions', 'ra', 54000)]), { months: 12, dependants: 1 }); calc('declaration'); rel('declaration', 'G05'); }],
       ['2026-08-25 19:30', () => { drive('declaration', 'G18'); }],
-      ['2026-10-13 10:00', () => { file('declaration'); }],
+      // The morning watcher raised PRE-04 on 9 Oct (10 business days before the 23 Oct deadline for non-provisional taxpayers).
+      ['2026-10-13 10:00', () => {
+        const x = ENGINE.exOf(K.declaration.c).find((y) => y.code === 'PRE-04' && ENGINE.isOpen(y));
+        if (x) ok(ENGINE.resolve(x, K.declaration.tc, { action: 'Filing plan approved: the return goes today, before the 23 Oct deadline; the client was told by email' }), 'declaration resolve PRE-04');
+        file('declaration');
+      }],
       ['2026-11-03 07:30', () => {
         const { c, cl } = K.declaration;
         ENGINE.receive({ fn: 'daIn', taxRef: cl.taxRef, year: c.year, ref: 'DA-2026-118204', date: '2026-11-03', due: '2026-11-17', data: { questions: [
@@ -283,6 +288,13 @@ const DEMO_SEED = (() => {
       ['2026-08-07 12:30', () => { ok(ENGINE.portal(K.closed.c, 'decide', { choice: 'accept', note: '' }), 'closed decide'); }],
     ]);
 
+    // The deadline watcher runs every morning at 07:00, from the first seeded day to the demo day (9 Nov 2026), as the live clock
+    // would have. So PRE-04, DA-05, VRF-03 and REM-09 appear in the trail on the day they fall inside the warning window.
+    const first = steps.reduce((m, s) => (s.when < m ? s.when : m), steps[0].when).slice(0, 10);
+    for (let d = DATES.dt(first); DATES.iso(d) <= '2026-11-09'; d = DATES.add(d, 1)) {
+      const day = DATES.iso(d);
+      steps.push({ when: day + ' 07:00', key: 'watch', fn: () => { const n = S.watchErrors || 0; ENGINE.watch(); if ((S.watchErrors || 0) > n) P.push('watch on ' + day + ': a case failed'); } });
+    }
     steps.sort((a, b) => (a.when < b.when ? -1 : a.when > b.when ? 1 : 0));
     steps.forEach((s) => { try { at(s.when, s.fn); } catch (e) { P.push(s.key + ' at ' + s.when + ': ' + e.message); } });
     at('2026-11-09 08:58', () => ENGINE.watch());
