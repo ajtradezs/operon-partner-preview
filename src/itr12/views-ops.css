@@ -1,0 +1,52 @@
+/* Approvals, Exceptions and the SARS link (views-approvals.js, views-exceptions.js, views-sars.js). Built on the shell's --op-* tokens
+   and the kit's vk-* classes; only what those do not cover is here. Nothing may push the page wider than a 390px phone. */
+
+/* Lists of unmet criteria inside a table cell */
+.ops-miss{margin:2px 0 0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:2px}
+.ops-miss li{overflow-wrap:anywhere}
+.vk-tablewrap tr.ops-ready td:first-child,.vk-tablewrap tr.ops-mine td:first-child{box-shadow:inset 3px 0 0 var(--op-accent)}
+.vk-tablewrap .vk-okline{margin:0;font-size:13px}
+
+/* Who releases each gate: a compact two-column list on wide screens */
+.ops-wholist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));column-gap:24px}
+.ops-wholist>li:nth-child(2){border-top:0;padding-top:2px}
+.ops-wholist>li{padding:8px 0}
+.ops-who .vk-gate{min-width:46px;justify-content:center}
+.ops-who.ops-mine .vk-gate{border-color:var(--op-accent);color:var(--op-ink)}
+@media (max-width:900px){.ops-wholist>li:nth-child(2){border-top:1px solid var(--op-rule);padding-top:8px}}
+
+/* Several buttons in one place */
+.ops-btns{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center;white-space:normal}
+.vk-tablewrap td.vk-act .ops-btns{max-width:30ch}
+.ops-btns .locked{align-items:flex-end}
+.row.ops-btns{justify-content:flex-start}
+.vk-sec>.row.ops-btns .locked,.vk-sec .row .locked{align-items:flex-start}
+
+/* Register filters */
+.ops-filters{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 12px;align-items:end}
+.ops-filters label.f{font-size:12px;color:var(--op-ink-muted);font-weight:600}
+.ops-filters select,.ops-filters input{width:100%;min-width:0}
+.ops-sum{gap:6px 14px;font-size:13px}
+.ops-sumi{display:inline-flex;align-items:center;gap:6px}
+.ops-sumi b{font-variant-numeric:tabular-nums}
+
+/* G18 checks per open transaction */
+.ops-txgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px}
+.ops-tx{display:flex;flex-direction:column;gap:8px;border:1px solid var(--op-rule);border-radius:8px;padding:10px 12px;background:var(--op-surface);min-width:0}
+.ops-tx .row{gap:6px 8px}
+.ops-tx .vk-checks{font-size:13px}
+.ops-tx .err{margin:0}
+
+/* Radio choices in dialogs */
+.ops-radios{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.ops-radios legend{margin-bottom:6px}
+.ops-radios label{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.ops-radios input{margin-top:3px;flex:none}
+
+@media (max-width:760px){
+  .ops-btns,.vk-tablewrap td.vk-act .ops-btns{justify-content:flex-start;max-width:none}
+  .ops-btns .locked{align-items:flex-start}
+  .ops-filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .vk-tablewrap tr.ops-ready td:first-child,.vk-tablewrap tr.ops-mine td:first-child{box-shadow:none}
+  .vk-cards tr.ops-ready,.vk-cards tr.ops-mine{box-shadow:inset 3px 0 0 var(--op-accent)}
+}

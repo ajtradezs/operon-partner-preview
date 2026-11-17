@@ -391,7 +391,7 @@ def read(rel: str) -> str:
 
 
 SCREEN = re.compile(r"^(itr12/views-[a-z]+|papersync)\.(js|css)$")
-ALWAYS = {"itr12/views-kit.js", "itr12/views.css"}
+ALWAYS = {"itr12/views-kit.js", "itr12/views.css", "itr12/views-cases.css", "itr12/views-ops.css", "itr12/views-admin.css"}
 
 
 def assemble(only: set[str] | None = None) -> tuple[str, str, list[str]]:

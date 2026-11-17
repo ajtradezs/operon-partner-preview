@@ -1,0 +1,65 @@
+/* The Cases board (views-cases.js) and the case page (views-case.js). Built on the shell's --op-* tokens and the kit's classes in
+   views.css; nothing here scrolls the page sideways. Board classes start cb-, case-page classes cs-. */
+
+/* Board: the phases wrap into rows instead of scrolling sideways, so every column is a drop target on screen */
+.cb-cols{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;align-items:start}
+.cb-col{display:flex;flex-direction:column;gap:8px;min-width:0;background:var(--op-surface-2);border:1px solid var(--op-rule);border-radius:var(--r);padding:10px}
+.cb-col-h{display:flex;align-items:center;gap:8px;min-width:0}
+.cb-col-h h3{font-size:14px;font-weight:650;margin:0;min-width:0;overflow-wrap:anywhere}
+.cb-gates{font-size:11px;color:var(--op-ink-muted);margin-left:auto;white-space:nowrap}
+.cb-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-height:56px;border-radius:8px}
+.cb-none{padding:10px;text-align:center;border:1px dashed var(--op-border);border-radius:8px}
+.cb-card{display:flex;flex-direction:column;gap:6px;min-width:0;background:var(--op-surface);border:1px solid var(--op-rule);border-radius:8px;padding:9px 10px;box-shadow:0 1px 0 var(--op-rule);cursor:grab;touch-action:manipulation}
+.cb-card:focus-within{border-color:var(--op-accent)}
+.cb-card-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0;font-size:14px}
+.cb-card-h>a:first-child{font-family:var(--font-mono);font-weight:700}
+.cb-name{min-width:0;overflow-wrap:anywhere;font-weight:500}
+.cb-line{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+.cb-line .small{line-height:1.3}
+.cb-card .vk-codes{margin-top:0}
+.cb-meta{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.cb-acts{display:flex;flex-wrap:wrap;gap:6px;padding-top:2px}
+.cb-acts .btn{cursor:pointer}
+.cb-inc{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;line-height:20px;padding:0 8px;border-radius:4px;background:var(--op-tier-held-bg);color:var(--op-tier-held-text);border:1px solid var(--op-tier-held-fg);text-decoration:none;white-space:nowrap}
+.cb-inc:hover{text-decoration:underline}
+.cb-ghost{opacity:.35}
+.cb-chosen{border-color:var(--op-accent)}
+.cb-drag{box-shadow:var(--op-shadow,0 8px 24px rgba(0,0,0,.18));transform:rotate(1deg)}
+body.cb-dragging,body.cb-dragging *{user-select:none!important;cursor:grabbing!important}
+body.cb-dragging .cb-list{outline:1.5px dashed var(--op-border);outline-offset:2px}
+body.rv-arranging .cb-card{cursor:default}
+
+/* The latest move: what happened, and the codes that stopped it */
+.cb-last{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--op-rule);border-left-width:4px;border-radius:var(--r);padding:10px 12px;background:var(--op-surface);font-size:14px;min-width:0}
+.cb-last.ok{border-left-color:var(--op-success)}
+.cb-last.bad{border-left-color:var(--op-danger)}
+.cb-last>svg{flex:none;margin-top:4px}
+.cb-last.ok>svg{color:var(--op-success)}
+.cb-last.bad>svg{color:var(--op-danger)}
+.cb-last>div{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;overflow-wrap:anywhere}
+.cb-last>.btn{flex:none}
+
+/* Case page */
+.vk-sec[data-rv-key^="cases-"] .num{white-space:nowrap}
+.cs-h3{font-size:14px;font-weight:650;margin:6px 0 0}
+.cs-h4{font-size:13px;font-weight:650;margin:4px 0 0;color:var(--op-ink-muted)}
+.vk-sec .vk-track{margin-bottom:4px}
+.vk-tablewrap tr.cs-now td{background:var(--op-accent-soft)}
+.vk-tablewrap tr.cs-total td{font-weight:650}
+.vk-tablewrap tr.cs-diff td{background:var(--op-warning-soft)}
+.cs-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px 24px;align-items:start}
+.cs-more{border-top:1px solid var(--op-rule);padding-top:8px}
+.cs-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--op-ink-muted)}
+.cs-more[open]>summary{margin-bottom:8px}
+.cs-21{display:flex;flex-direction:column;gap:6px}
+.cs-21-bar{height:8px;border-radius:999px;background:var(--op-surface-2);border:1px solid var(--op-rule);overflow:hidden}
+.cs-21-bar>span{display:block;height:100%;background:var(--op-accent)}
+.vk-sec dl.facts dd{min-width:0;overflow-wrap:anywhere}
+
+@media (max-width:760px){
+  .cb-cols{grid-template-columns:minmax(0,1fr)}
+  .cb-last{flex-wrap:wrap}
+  .vk-cards tr.cs-now{background:var(--op-accent-soft)}
+  .vk-cards tr.cs-now td,.vk-cards tr.cs-diff td{background:transparent}
+  .vk-cards tr.cs-diff{background:var(--op-warning-soft)}
+}

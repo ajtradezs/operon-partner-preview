@@ -1,0 +1,72 @@
+/* PaperSync (papersync.js) and Try it (itr12/views-try.js). Built on the shell's --op-* tokens, so light and dark follow the theme.
+   Nothing here may push the page wider than the screen: boards and lists wrap, long names and hashes break. */
+
+/* Requests board: one column per thing a client can owe. Columns wrap instead of scrolling. */
+.ps-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:10px;align-items:start}
+.ps-col{background:var(--op-surface-2);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ps-col-h{font-size:13px;font-weight:600;letter-spacing:.02em;display:flex;align-items:center;gap:6px;margin:0}
+.ps-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ps-card{background:var(--op-surface);border:1px solid var(--op-rule);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0;overflow-wrap:anywhere}
+.ps-card-t{font-weight:600;font-size:14px}
+.ps-owe{font-size:13px;line-height:1.4}
+.ps-card-a{display:flex;flex-wrap:wrap;gap:6px}
+.ps-btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
+.ps-mini{margin:0;padding-left:18px;font-size:13px}
+.ps-mini li+li{margin-top:2px}
+.ps-kyc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ps-kyc li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 10px;font-size:14px}
+.ps-h3{font-size:14px;font-weight:600;margin:6px 0 0}
+.ps-seg{flex-wrap:wrap;margin-bottom:4px}
+.ps-seg button:disabled{opacity:1;cursor:default}
+.vk-tablewrap td.vk-act .ps-btns{white-space:normal}
+
+/* The portal */
+.ps-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,140px),1fr));gap:8px}
+.ps-step{display:flex;flex-direction:column;align-items:flex-start;gap:6px;border:1px solid var(--op-rule);border-radius:8px;padding:10px;min-width:0}
+.ps-step-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:var(--op-surface-2);font-size:12px;font-weight:700;font-family:var(--font-mono)}
+.ps-step-l{font-weight:600;font-size:14px}
+.ps-st-done .ps-step-n{background:var(--op-tier-auto-bg);color:var(--op-tier-auto-text)}
+.ps-st-yours{border-color:var(--op-accent);background:var(--op-accent-soft)}
+.ps-qs,.ps-items,.ps-files{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ps-q{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px;padding:8px 0;border-top:1px solid var(--op-rule)}
+.ps-q:first-child{border-top:0;padding-top:0}
+.ps-q-l{flex:1 1 260px;min-width:0;font-size:14px}
+.ps-q-opts{display:inline-flex;gap:14px}
+.ps-q-opts label{display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
+.ps-ans{font-weight:600;font-size:14px}
+.ps-item{display:flex;flex-direction:column;gap:6px;padding:12px;margin:0 -12px;border-top:1px solid var(--op-rule);border-radius:8px;outline:2px dashed transparent;outline-offset:-2px;transition:outline-color .12s,background-color .12s;min-width:0}
+.ps-item:first-child{border-top:0}
+.ps-item.ps-over{outline-color:var(--op-accent);background:var(--op-accent-soft)}
+.ps-item-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.ps-item .ps-btns{justify-content:flex-start}
+.ps-files{gap:4px}
+.ps-file{font-size:13px;overflow-wrap:anywhere}
+.ps-fname{font-family:var(--font-mono);font-size:12px}
+.ps-codes{display:inline-flex;margin-top:2px}
+.ps-dropnote{margin-left:2px}
+.ps-hash{display:block;font-size:12px;line-height:1.5;overflow-wrap:anywhere;word-break:break-all}
+.ps-approve{display:flex;flex-direction:column;gap:12px}
+.ps-decl{margin:0;padding:10px 14px;border-left:3px solid var(--op-accent);background:var(--op-surface-2);border-radius:0 8px 8px 0;font-size:14px;line-height:1.5}
+.ps-check{display:flex;align-items:flex-start;gap:8px;font-weight:600;font-size:14px;cursor:pointer}
+.ps-check input{margin-top:3px;flex:none}
+.ps-verify{display:flex;flex-direction:column;gap:10px;max-width:440px}
+
+/* Try it */
+.ps-try p{font-size:14px}
+.ps-res{display:flex;flex-direction:column;gap:6px;border-radius:8px;padding:10px 12px;background:var(--op-surface-2);border:1px solid var(--op-rule);font-size:14px;min-width:0;overflow-wrap:anywhere}
+.ps-res-h{display:flex;gap:8px;align-items:flex-start}
+.ps-res-h>svg{flex:none;margin-top:4px}
+.ps-res-stop{border-color:var(--op-tier-hold-fg);background:var(--op-tier-hold-bg);color:var(--op-tier-hold-text)}
+.ps-res-ok{border-color:var(--op-tier-auto-fg);background:var(--op-tier-auto-bg);color:var(--op-tier-auto-text)}
+.ps-res-err{border-color:var(--op-danger);background:var(--op-tier-held-bg);color:var(--op-tier-held-text)}
+.ps-res .muted{color:inherit;opacity:.8}
+.ps-res a{color:inherit;text-decoration:underline}
+.ps-res a.vk-code{text-decoration:none}
+.ps-res-l{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.ps-res-a{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+.ps-res .vk-codes{display:inline-flex;margin-top:0;vertical-align:middle}
+
+@media (max-width:760px){
+  .ps-btns{justify-content:flex-start}
+  .ps-item{margin:0 -8px;padding:10px 8px}
+}

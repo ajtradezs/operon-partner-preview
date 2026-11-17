@@ -1595,8 +1595,11 @@ function rvJumpCheck() {
 /* ---------- the hooks the app calls ---------- */
 const REVIEW = {
   pending: false,
+  holds: 0,
+  // A screen holds rendering during its own drag (the Cases board); releasing the last hold renders what was deferred.
+  hold(on) { REVIEW.holds = Math.max(0, REVIEW.holds + (on ? 1 : -1)); if (!on) rvFlushPending(); },
   busy() {
-    if (RV.dragging) return true;
+    if (RV.dragging || REVIEW.holds > 0) return true;
     const ae = document.activeElement;
     return !!(ae && ae.isContentEditable && ae.closest && ae.closest('#app'));
   },

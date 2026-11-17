@@ -1,0 +1,97 @@
+/* Admin screens: Clients, Deadlines, Controls, Incidents, Retention, Audit trail and Import clients (views-clients.js,
+   views-deadlines.js, views-controls.js, views-records.js, views-import.js). Built on the shell's --op-* tokens and the kit's
+   classes (views.css); nothing here may push the page wider than the phone. */
+
+/* Words with an icon, never colour alone */
+.adm-yes,.adm-no{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;white-space:nowrap}
+.adm-yes{color:var(--op-success)}
+.adm-no{color:var(--op-danger)}
+.adm-yes>svg,.adm-no>svg{flex:none}
+
+/* Headings and lists inside a section */
+.adm-h3{font-size:14px;font-weight:700;margin:6px 0 0;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.adm-items{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px;min-width:0}
+.adm-items li{overflow-wrap:anywhere}
+.adm-filters{margin-bottom:2px}
+.adm-seg{max-width:100%}
+.adm-tabs{margin-top:4px}
+
+/* The client master's field groups */
+.adm-groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}
+.adm-group{border:1px solid var(--op-rule);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0;background:var(--op-surface)}
+.adm-group h3{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--op-ink-muted);margin:0}
+.adm-group dl.facts{grid-template-columns:minmax(110px,40%) minmax(0,1fr);font-size:13px;gap:4px 12px}
+@media (max-width:520px){.adm-group dl.facts{grid-template-columns:1fr}.adm-group dl.facts dd{margin-bottom:4px}}
+
+/* A gate line with its action, and exception rows with an action on the right */
+.adm-gateline{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding-top:4px;min-width:0}
+.adm-gateline>span{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.adm-exrow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-start;justify-content:space-between;min-width:0}
+.adm-exrow>.vk-row-b{flex:1 1 260px}
+.adm-exact{flex:none;max-width:100%}
+.adm-exact .lock{white-space:normal;max-width:32ch}
+
+/* Rows that need attention in a table */
+.vk-tablewrap tr.adm-diff>td{background:var(--op-warning-soft)}
+
+/* Matrices (KYC repository, segregation of duties): compact cells */
+.adm-matrix td,.adm-matrix th{font-size:13px}
+.adm-matrix td .adm-yes,.adm-matrix td .adm-no{font-size:12px}
+
+/* Deadlines */
+.adm-dl-date{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.adm-calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.adm-tool{display:flex;flex-direction:column;gap:10px;border:1px solid var(--op-rule);border-radius:8px;padding:12px;min-width:0;background:var(--op-surface)}
+.adm-tool h3{font-size:14px;font-weight:700;margin:0}
+.adm-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:8px}
+.adm-tool input,.adm-tool select{min-width:0;max-width:100%}
+.adm-check{display:flex;gap:8px;align-items:center;font-size:14px}
+.adm-radios{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;font-size:14px;min-width:0}
+.adm-radios label{display:flex;gap:8px;align-items:flex-start}
+.adm-radios input{margin-top:3px}
+.adm-result{border-top:1px solid var(--op-rule);padding-top:10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.adm-big{font-size:1.25rem;font-weight:700;margin:0}
+.adm-days{margin:6px 0 0;padding-left:0;list-style:none;font-size:13px;display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto}
+.adm-days .mono{display:inline-block;min-width:7ch;color:var(--op-ink-muted)}
+.adm-more>summary,.adm-result summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--op-accent);margin:2px 0}
+.adm-more[open]>summary{margin-bottom:8px}
+
+/* Controls */
+.adm-inline{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-top:6px}
+.adm-inline label.f{flex:1 1 240px}
+.adm-inline select{max-width:100%;min-width:0}
+.adm-q{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;align-items:start}
+.adm-qn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:var(--op-accent-soft);color:var(--op-ink);font-size:12px;font-weight:700}
+.adm-q p{margin:2px 0 0}
+.adm-ruleset{display:flex;flex-direction:column;gap:6px;min-width:0}
+.adm-ruleset+.adm-ruleset{margin-top:10px}
+.adm-ruleset .vk-tablewrap{margin-inline:0}
+
+/* Incidents */
+.adm-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.adm-step{border:1px solid var(--op-rule);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0;background:var(--op-surface)}
+.adm-step.done{border-color:var(--op-tier-auto-fg)}
+.adm-step-h{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;justify-content:space-between}
+.adm-step p{margin:0;overflow-wrap:anywhere}
+.adm-step textarea{min-height:64px}
+
+/* Audit trail */
+.adm-more-btn{display:flex;justify-content:center;padding-top:10px}
+
+/* Import */
+.adm-upload{display:flex;flex-direction:column;gap:10px;min-width:0}
+.adm-upload textarea{min-height:110px;font-size:13px}
+.adm-upload input[type=file]{max-width:100%}
+.adm-sum{margin:0;font-size:14px}
+.adm-msg{display:flex;gap:6px;align-items:flex-start;font-size:13px;line-height:1.4}
+.adm-msg>svg{flex:none;margin-top:3px}
+.adm-msg.bad{color:var(--op-danger)}
+.adm-msg.warn{color:var(--op-warning)}
+.adm-msg span{color:var(--op-ink)}
+
+@media (max-width:760px){
+  .adm-seg button{padding:6px 10px}
+  .adm-gateline .btn{white-space:normal}
+}
+.adm-gap{margin:0}
+.adm-gap-h{font-weight:600}

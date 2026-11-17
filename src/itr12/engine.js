@@ -93,7 +93,7 @@ const ENGINE = (() => {
     const p = S.people.find((x) => x.id === a.id);
     if (!p) return 'Unknown or revoked user ' + a.id;
     if (p.role !== a.role) return p.name + ' does not hold the ' + a.role + ' role';
-    if (want && !want.includes(a.role)) return 'Only a ' + want.join(' or a ') + ' can do this';
+    if (want && !want.includes(a.role)) return 'Only ' + want.map((r) => (/^[AEIOU]/.test(r) ? 'an ' : 'a ') + r).join(' or ') + ' can do this';
     return null;
   }
 
@@ -142,14 +142,17 @@ const ENGINE = (() => {
     ra: 'RA_certificate_2026.pdf', rental: 'Rental_schedule_2026.pdf', logbook: 'Logbook_2026.pdf', homeoffice: 'Home_office_expenses_2026.pdf',
     donation: 'Section18A_receipt_2026.pdf', foreign: 'Foreign_income_statement_2026.pdf', bank: 'Bank_confirmation_2026.pdf', notice: 'SARS_notice_2026.pdf' };
 
-  function newClient(o) {
+  // a: the person adding the client (an Administrator). The seed and the engine's own walk-through pass none (the system).
+  function newClient(o, a) {
     o = o || {};
+    if (a) { const w = staffWhy(a, 'Administrator'); if (w) return refuse(a, null, 'Adding a client refused', w); }
     const kyc = KYC_ITEMS.map((k) => ({ key: k.key, label: k.label, ok: o.kyc && k.key in o.kyc ? !!o.kyc[k.key] : true }));
     // The default ID number deliberately fails the SA ID checksum: every identity in the preview is made up.
     const cl = { id: nextId('clientN', 'CL', 2), name: o.name || 'Demo Client', idNo: o.idNo || '8001015009088', taxRef: o.taxRef || '0123456789',
       provisional: o.provisional !== false, others: (o.others || []).slice(), kyc, email: o.email || null };
+    if (o.master && typeof o.master === 'object') cl.master = Object.assign({}, o.master);
     S.clients.push(cl);
-    log(ACTOR.system(), 'Added client ' + cl.id + ' to the permanent client repository', { client: cl.id });
+    log(a || ACTOR.system(), 'Added client ' + cl.id + ' to the permanent client repository', { client: cl.id });
     return cl;
   }
   function setKyc(cl, key, ok, a) {
@@ -768,6 +771,8 @@ const ENGINE = (() => {
     o = o || {};
     const c = caseOf(x); const audit = { exceptionId: x.id, code: x.code };
     if (!x.fallback) return refuse(a, c, 'Fallback refused', x.code + ' is not a Conditional code', audit);
+    // An unreadable SARS date is never settled by a note: the dates are confirmed from the notice (confirmInboundDate).
+    if (x.code === 'INT-15' && x.inboundId) return refuse(a, c, 'Fallback refused', 'Confirm the dates from the SARS notice (Confirm dates on the SARS link page)', audit);
     const w = staffWhy(a); if (w) return refuse(a, c, 'Fallback refused', w, audit);
     if (x.fallback.recorded) return refuse(a, c, 'Fallback refused', 'A fallback is already recorded for ' + x.id + ' by ' + pname(x.fallback.recorded.by), audit);
     x.fallback.recorded = { by: a.id, at: now(), note: o.note || '', ref: o.ref || null };
@@ -780,6 +785,10 @@ const ENGINE = (() => {
     if (!x.fallback || !x.fallback.recorded) return refuse(a, c, 'Reconciliation refused', 'Record the fallback first', audit);
     if (x.fallback.reconciled) return fail('Already reconciled');
     const w = staffWhy(a); if (w) return refuse(a, c, 'Reconciliation refused', w, audit);
+    if (x.code === 'INT-15' && x.inboundId) {
+      const it = S.inbound.find((y) => y.id === x.inboundId);
+      if (it && !it.date) return refuse(a, c, 'Reconciliation refused', 'The notice date is still unconfirmed', audit);
+    }
     const t = x.code === 'INT-13' && x.txId ? txById(x.txId) : null;
     if (a.id === x.fallback.recorded.by || (t && t.manual && t.manual.by === a.id)) return refuse(a, c, 'Reconciliation refused', 'A different person must reconcile the fallback independently', audit);
     x.fallback.reconciled = { by: a.id, at: now(), note: o.note || '', found: o.processed !== false };
@@ -1291,6 +1300,9 @@ const ENGINE = (() => {
     const a = ACTOR.client(c.clientId, 'portal');
     const q = c.questionnaire;
     switch (action) {
+      case 'verify':
+        log(a, 'Opened the PaperSync portal with a one-time code (simulated)', Object.assign(cf(c), { result: 'Verified' }));
+        return okr();
       case 'answer': {
         const qq = QUESTIONS.find((x) => x.key === d.key); if (!qq) return fail('Unknown question ' + d.key);
         q.answers[d.key] = !!d.value;
